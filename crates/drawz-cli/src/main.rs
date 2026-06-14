@@ -1,7 +1,6 @@
 use std::io::Read;
 
 use drawz_core::schema::DiagramInput;
-use drawz_core::render;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -11,11 +10,31 @@ fn main() {
         .and_then(|v| v.parse().ok());
 
     let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input).expect("failed to read stdin");
+    if let Err(e) = std::io::stdin().read_to_string(&mut input) {
+        eprintln!("error: failed to read stdin: {e}");
+        std::process::exit(1);
+    }
 
-    let diagram_input: DiagramInput = serde_json::from_str(&input).expect("invalid diagram JSON");
+    let diagram_input: DiagramInput = match serde_json::from_str(&input) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("error: invalid diagram JSON: {e}");
+            std::process::exit(1);
+        }
+    };
 
-    // CLI --width overrides JSON width; JSON width overrides default (80)
     let width = cli_width.unwrap_or(diagram_input.width);
-    println!("{}", render::render(&diagram_input.diagram, width));
+    let result = drawz_core::render(&diagram_input.diagram, width);
+
+    if let Some(output) = &result.output {
+        println!("{output}");
+    }
+    for err in &result.errors {
+        eprintln!("error: {err}");
+    }
+    for warn in &result.warnings {
+        eprintln!("warning: {warn}");
+    }
+
+    std::process::exit(i32::from(!result.errors.is_empty()));
 }

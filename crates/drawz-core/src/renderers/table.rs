@@ -1,0 +1,106 @@
+use crate::measure::{display_width, pad_right, truncate};
+use crate::result::RenderContext;
+use crate::schema::TableDiagram;
+
+/// Render table with auto-sized columns, borders, and truncation.
+///
+/// # Errors
+///
+/// Returns an error if headers are empty or the table cannot fit at the given width.
+pub fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+    if diagram.headers.is_empty() {
+        return Err("table requires at least one header".to_string());
+    }
+
+    let num_cols = diagram.headers.len();
+    let separator_width = if num_cols > 1 { (num_cols - 1) * 3 } else { 0 };
+    let available = ctx.inner_width.saturating_sub(separator_width);
+
+    if available < num_cols {
+        return Err(format!(
+            "cannot render {num_cols}-column table at width {} (minimum needed: {})",
+            ctx.total_width,
+            separator_width + num_cols * 6
+        ));
+    }
+
+    // Compute natural column widths from content
+    let mut col_widths: Vec<usize> = diagram.headers.iter().map(|h| display_width(h)).collect();
+    for row in &diagram.rows {
+        for (i, cell) in row.iter().enumerate() {
+            if i < num_cols {
+                col_widths[i] = col_widths[i].max(display_width(cell));
+            }
+        }
+    }
+
+    // Shrink columns to fit available width
+    let total_natural: usize = col_widths.iter().sum();
+    if total_natural > available {
+        let mut truncated = false;
+        for w in &mut col_widths {
+            let new_w = (*w * available) / total_natural;
+            let new_w = new_w.max(3);
+            if new_w < *w {
+                truncated = true;
+            }
+            *w = new_w;
+        }
+        // Fix rounding: shrink or grow to hit exactly `available`
+        let sum: usize = col_widths.iter().sum();
+        if sum < available {
+            col_widths[0] += available - sum;
+        } else if sum > available {
+            // Over-allocated due to .max(3) — shrink last columns to fit
+            let mut excess = sum - available;
+            for w in col_widths.iter_mut().rev() {
+                if excess == 0 { break; }
+                let reduce = excess.min(w.saturating_sub(3));
+                *w -= reduce;
+                excess -= reduce;
+            }
+        }
+        if truncated {
+            ctx.warnings.push("suggestion: reduce columns or set wider width".to_string());
+        }
+    }
+
+    let mut lines = Vec::new();
+
+    // Header line
+    let header: String = diagram.headers.iter().enumerate()
+        .map(|(i, h)| fit_cell(h, col_widths[i]))
+        .collect::<Vec<_>>()
+        .join(" │ ");
+    lines.push(pad_right(&header, ctx.inner_width));
+
+    // Separator line
+    let sep: String = col_widths.iter()
+        .map(|w| "─".repeat(*w))
+        .collect::<Vec<_>>()
+        .join("─┼─");
+    lines.push(pad_right(&sep, ctx.inner_width));
+
+    // Data rows
+    for row in &diagram.rows {
+        let cells: String = (0..num_cols)
+            .map(|i| {
+                let cell = row.get(i).map_or("", String::as_str);
+                fit_cell(cell, col_widths[i])
+            })
+            .collect::<Vec<_>>()
+            .join(" │ ");
+        lines.push(pad_right(&cells, ctx.inner_width));
+    }
+
+    Ok(lines)
+}
+
+fn fit_cell(content: &str, width: usize) -> String {
+    let w = display_width(content);
+    if w <= width {
+        pad_right(content, width)
+    } else {
+        truncate(content, width)
+    }
+}
