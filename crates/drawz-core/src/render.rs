@@ -29,9 +29,9 @@ pub fn render(diagram: &Diagram, width: u16) -> RenderResult {
     let lines = match diagram {
         Diagram::Freeform(d) => renderers::freeform::render(d, &mut ctx),
         Diagram::Table(d) => renderers::table::render(d, &mut ctx),
-        Diagram::Flow(_) => Err("flow rendering not yet implemented".to_string()),
-        Diagram::Tree(_) => Err("tree rendering not yet implemented".to_string()),
-        Diagram::State(_) => Err("state rendering not yet implemented".to_string()),
+        Diagram::Flow(d) => renderers::flow::render(d, &mut ctx),
+        Diagram::Tree(d) => renderers::tree::render(d, &mut ctx),
+        Diagram::State(d) => renderers::state::render(d, &mut ctx),
         Diagram::Sequence(_) => Err("sequence rendering not yet implemented".to_string()),
         Diagram::Dag(_) => Err("dag rendering not yet implemented".to_string()),
         Diagram::Mermaid(_) => Err("mermaid rendering not yet implemented".to_string()),

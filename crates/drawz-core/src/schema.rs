@@ -1,3 +1,10 @@
+//! Diagram schema types — the JSON-to-Rust mapping.
+//!
+//! Fields are intentionally undocumented in rustdoc; they map 1:1 to JSON input
+//! fields documented in the PRD.
+
+#![allow(missing_docs)]
+
 use serde::Deserialize;
 
 /// Top-level input wrapper. Extracts `width` before dispatching to diagram type.

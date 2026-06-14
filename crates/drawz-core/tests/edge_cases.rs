@@ -164,10 +164,7 @@ fn unimplemented_types_return_error() {
     use drawz_core::schema::*;
 
     let cases: Vec<Diagram> = vec![
-        Diagram::Flow(FlowDiagram { title: None, steps: Some(vec![FlowStep::Label("A".into())]), nodes: None, edges: None }),
-        Diagram::State(StateDiagram { title: None, states: None, transitions: vec![] }),
         Diagram::Dag(DagDiagram { title: None, nodes: None, edges: vec![] }),
-        Diagram::Tree(TreeDiagram { title: None, root: None, indent: Some("a\n  b".into()) }),
         Diagram::Sequence(SequenceDiagram { title: None, actors: vec!["A".into()], messages: vec![] }),
         Diagram::Mermaid(MermaidDiagram { title: None, code: "graph LR; A-->B".into() }),
     ];
@@ -177,6 +174,151 @@ fn unimplemented_types_return_error() {
         assert!(!result.errors.is_empty(), "expected error for unimplemented type");
         assert!(result.output.is_none());
     }
+}
+
+// === tree integration ===
+
+#[test]
+fn tree_indent_alignment() {
+    use drawz_core::schema::*;
+    let d = Diagram::Tree(TreeDiagram {
+        title: None,
+        root: None,
+        indent: Some("src\n  main.rs\n  lib.rs\n  utils\n    helper.rs".into()),
+    });
+    let result = render(&d, 40);
+    assert!(result.errors.is_empty());
+    let output = result.output.unwrap();
+    for line in output.lines() {
+        assert_eq!(display_width(line), 40, "misaligned: {line:?}");
+    }
+    assert!(output.contains("├──") || output.contains("└──"));
+}
+
+#[test]
+fn tree_node_alignment() {
+    use drawz_core::schema::*;
+    let d = Diagram::Tree(TreeDiagram {
+        title: None,
+        root: Some(TreeNode {
+            label: "root".into(),
+            children: vec![
+                TreeNode { label: "child1".into(), children: vec![] },
+                TreeNode { label: "child2".into(), children: vec![
+                    TreeNode { label: "grandchild".into(), children: vec![] },
+                ] },
+            ],
+        }),
+        indent: None,
+    });
+    let result = render(&d, 40);
+    assert!(result.errors.is_empty());
+    let output = result.output.unwrap();
+    for line in output.lines() {
+        assert_eq!(display_width(line), 40, "misaligned: {line:?}");
+    }
+}
+
+#[test]
+fn tree_missing_input_error() {
+    use drawz_core::schema::*;
+    let d = Diagram::Tree(TreeDiagram { title: None, root: None, indent: None });
+    let result = render(&d, 80);
+    assert!(!result.errors.is_empty());
+}
+
+// === flow integration ===
+
+#[test]
+fn flow_linear_steps_alignment() {
+    use drawz_core::schema::*;
+    let d = Diagram::Flow(FlowDiagram {
+        title: None,
+        steps: Some(vec![
+            FlowStep::Label("Build".into()),
+            FlowStep::Label("Test".into()),
+            FlowStep::Label("Deploy".into()),
+        ]),
+        nodes: None,
+        edges: None,
+    });
+    let result = render(&d, 30);
+    assert!(result.errors.is_empty());
+    let output = result.output.unwrap();
+    for line in output.lines() {
+        assert_eq!(display_width(line), 30, "misaligned: {line:?}");
+    }
+}
+
+#[test]
+fn flow_nested_subflow_alignment() {
+    use drawz_core::schema::*;
+    let d = Diagram::Flow(FlowDiagram {
+        title: None,
+        steps: Some(vec![
+            FlowStep::Label("Start".into()),
+            FlowStep::Sub(SubFlow {
+                label: "Processing".into(),
+                steps: vec![FlowStep::Label("Step A".into()), FlowStep::Label("Step B".into())],
+            }),
+            FlowStep::Label("End".into()),
+        ]),
+        nodes: None,
+        edges: None,
+    });
+    let result = render(&d, 40);
+    assert!(result.errors.is_empty());
+    let output = result.output.unwrap();
+    for line in output.lines() {
+        assert_eq!(display_width(line), 40, "misaligned: {line:?}");
+    }
+}
+
+#[test]
+fn flow_empty_steps_error() {
+    use drawz_core::schema::*;
+    let d = Diagram::Flow(FlowDiagram {
+        title: None,
+        steps: Some(vec![]),
+        nodes: None,
+        edges: None,
+    });
+    let result = render(&d, 80);
+    assert!(!result.errors.is_empty());
+}
+
+// === state integration ===
+
+#[test]
+fn state_transitions_alignment() {
+    use drawz_core::schema::*;
+    let d = Diagram::State(StateDiagram {
+        title: None,
+        states: None,
+        transitions: vec![
+            Edge { from: "Idle".into(), to: "Running".into(), label: Some("start".into()) },
+            Edge { from: "Running".into(), to: "Done".into(), label: None },
+        ],
+    });
+    let result = render(&d, 30);
+    assert!(result.errors.is_empty());
+    let output = result.output.unwrap();
+    for line in output.lines() {
+        assert_eq!(display_width(line), 30, "misaligned: {line:?}");
+    }
+    assert!(output.contains("╭") && output.contains("╰"));
+}
+
+#[test]
+fn state_empty_transitions_error() {
+    use drawz_core::schema::*;
+    let d = Diagram::State(StateDiagram {
+        title: None,
+        states: None,
+        transitions: vec![],
+    });
+    let result = render(&d, 80);
+    assert!(!result.errors.is_empty());
 }
 
 // === freeform uses lines field ===
