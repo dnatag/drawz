@@ -8,3 +8,7 @@ pub mod state;
 pub mod table;
 /// Tree hierarchy renderer.
 pub mod tree;
+/// Sequence diagram renderer.
+pub mod sequence;
+/// DAG dependency graph renderer.
+pub mod dag;

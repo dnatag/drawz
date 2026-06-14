@@ -18,6 +18,8 @@ pub mod frame;
 pub mod render;
 /// Per-type diagram renderers.
 pub mod renderers;
+/// Mermaid subset parser.
+pub mod mermaid;
 
 pub use render::render;
 pub use result::RenderResult;

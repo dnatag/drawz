@@ -388,3 +388,91 @@ fn narrow_width_all_types_still_align() {
         assert_and_print(label, &result, width);
     }
 }
+
+// ═══════════════════════════════════════════════════
+// Phase 3: Sequence, DAG, Mermaid
+// ═══════════════════════════════════════════════════
+
+#[test]
+fn sequence_diagram_renders_actors_and_messages() {
+    let d = Diagram::Sequence(SequenceDiagram {
+        title: Some("Auth Flow".into()),
+        actors: vec!["Client".into(), "Auth".into(), "API".into()],
+        messages: vec![
+            Message { from: "Client".into(), to: "Auth".into(), label: "login".into() },
+            Message { from: "Auth".into(), to: "API".into(), label: "token".into() },
+            Message { from: "API".into(), to: "Client".into(), label: "data".into() },
+        ],
+    });
+    let result = render(&d, 60);
+    assert_and_print("Sequence: Auth Flow", &result, 60);
+    let output = result.output.unwrap();
+    assert!(output.contains("Client"));
+    assert!(output.contains("Auth"));
+    assert!(output.contains("API"));
+}
+
+#[test]
+fn dag_renders_layered_dependencies() {
+    let d = Diagram::Dag(DagDiagram {
+        title: Some("Build Graph".into()),
+        nodes: Some(vec![
+            Node { id: Some("parse".into()), label: "Parse".into() },
+            Node { id: Some("lint".into()), label: "Lint".into() },
+            Node { id: Some("compile".into()), label: "Compile".into() },
+            Node { id: Some("link".into()), label: "Link".into() },
+        ]),
+        edges: vec![
+            Edge { from: "parse".into(), to: "lint".into(), label: None },
+            Edge { from: "parse".into(), to: "compile".into(), label: None },
+            Edge { from: "lint".into(), to: "link".into(), label: None },
+            Edge { from: "compile".into(), to: "link".into(), label: None },
+        ],
+    });
+    let result = render(&d, 40);
+    assert_and_print("DAG: Build Graph", &result, 40);
+    let output = result.output.unwrap();
+    assert!(output.contains("Parse"));
+    assert!(output.contains("Link"));
+    assert!(output.contains('▼'));
+}
+
+#[test]
+fn mermaid_flowchart_renders_as_flow() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "graph LR\nA[Request]-->B[Validate]\nB-->C[Process]\nC-->D[Response]".into(),
+    });
+    let result = render(&d, 40);
+    assert_and_print("Mermaid: Flowchart", &result, 40);
+    let output = result.output.unwrap();
+    assert!(output.contains("Request"));
+    assert!(output.contains("Response"));
+}
+
+#[test]
+fn mermaid_sequence_renders_as_sequence() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "sequenceDiagram\nAlice->>Bob: Hello\nBob-->>Alice: Hi back".into(),
+    });
+    let result = render(&d, 50);
+    assert_and_print("Mermaid: Sequence", &result, 50);
+    let output = result.output.unwrap();
+    assert!(output.contains("Alice"));
+    assert!(output.contains("Bob"));
+}
+
+#[test]
+fn mermaid_state_renders_as_state() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "stateDiagram-v2\nIdle --> Active : start\nActive --> Done : finish".into(),
+    });
+    let result = render(&d, 40);
+    assert_and_print("Mermaid: State Diagram", &result, 40);
+    let output = result.output.unwrap();
+    assert!(output.contains("Idle"));
+    assert!(output.contains("Active"));
+    assert!(output.contains("Done"));
+}

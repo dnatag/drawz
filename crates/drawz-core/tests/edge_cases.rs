@@ -157,23 +157,16 @@ fn table_row_fewer_cells_than_headers() {
     }
 }
 
-// === unimplemented types return errors ===
+// === previously unimplemented types now all work ===
+// (this test verifies error handling for invalid mermaid input)
 
 #[test]
-fn unimplemented_types_return_error() {
+fn mermaid_unsupported_type_returns_error() {
     use drawz_core::schema::*;
-
-    let cases: Vec<Diagram> = vec![
-        Diagram::Dag(DagDiagram { title: None, nodes: None, edges: vec![] }),
-        Diagram::Sequence(SequenceDiagram { title: None, actors: vec!["A".into()], messages: vec![] }),
-        Diagram::Mermaid(MermaidDiagram { title: None, code: "graph LR; A-->B".into() }),
-    ];
-
-    for d in &cases {
-        let result = render(d, 80);
-        assert!(!result.errors.is_empty(), "expected error for unimplemented type");
-        assert!(result.output.is_none());
-    }
+    let d = Diagram::Mermaid(MermaidDiagram { title: None, code: "pie\n  \"A\": 50\n  \"B\": 50".into() });
+    let result = render(&d, 80);
+    assert!(!result.errors.is_empty());
+    assert!(result.output.is_none());
 }
 
 // === tree integration ===

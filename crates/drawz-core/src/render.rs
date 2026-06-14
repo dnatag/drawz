@@ -1,4 +1,5 @@
 use crate::frame;
+use crate::mermaid;
 use crate::renderers;
 use crate::result::{RenderContext, RenderResult};
 use crate::schema::Diagram;
@@ -32,9 +33,14 @@ pub fn render(diagram: &Diagram, width: u16) -> RenderResult {
         Diagram::Flow(d) => renderers::flow::render(d, &mut ctx),
         Diagram::Tree(d) => renderers::tree::render(d, &mut ctx),
         Diagram::State(d) => renderers::state::render(d, &mut ctx),
-        Diagram::Sequence(_) => Err("sequence rendering not yet implemented".to_string()),
-        Diagram::Dag(_) => Err("dag rendering not yet implemented".to_string()),
-        Diagram::Mermaid(_) => Err("mermaid rendering not yet implemented".to_string()),
+        Diagram::Sequence(d) => renderers::sequence::render(d, &mut ctx),
+        Diagram::Dag(d) => renderers::dag::render(d, &mut ctx),
+        Diagram::Mermaid(d) => {
+            match mermaid::parse(&d.code) {
+                Ok(parsed) => return render(&parsed, width),
+                Err(e) => Err(e),
+            }
+        }
     };
 
     match lines {
