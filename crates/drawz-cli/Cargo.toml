@@ -1,0 +1,13 @@
+[package]
+name = "drawz-cli"
+version = "0.1.0"
+edition = "2021"
+description = "CLI for rendering structured diagrams as ASCII/Unicode art"
+
+[[bin]]
+name = "drawz"
+path = "src/main.rs"
+
+[dependencies]
+drawz-core = { path = "../drawz-core" }
+serde_json = "1"
