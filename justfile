@@ -8,11 +8,11 @@ test:
 
 # Run integration tests only
 test-int:
-    cargo test -p drawz-core --test edge_cases --test happy_path
+    cargo test -p drawz-core --test freeform --test table --test tree --test flow --test state --test sequence --test dag --test mermaid
 
-# Run happy-path tests with visible diagram output
+# Run integration tests with visible diagram output
 test-print:
-    cargo test -p drawz-core --test happy_path -- --nocapture
+    cargo test -p drawz-core --test freeform --test table --test tree --test flow --test state --test sequence --test dag --test mermaid -- --nocapture
 
 # Run clippy with pedantic lints
 lint:
