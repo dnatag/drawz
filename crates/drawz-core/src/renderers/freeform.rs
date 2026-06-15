@@ -2,16 +2,27 @@ use crate::measure::pad_right;
 use crate::result::RenderContext;
 use crate::schema::FreeformDiagram;
 
+/// Unescape common escape sequences that arrive as literals from JSON transport.
+fn unescape_ansi(s: &str) -> String {
+    s.replace("\\n", "\n")
+        .replace("\\t", "\t")
+        .replace("\\x1b", "\x1b")
+        .replace("\\u001b", "\x1b")
+        .replace("\\033", "\x1b")
+        .replace("\\e", "\x1b")
+}
+
 /// Render freeform: pad each line to `inner_width`, fixing alignment.
 ///
 /// # Errors
 ///
 /// Returns an error if neither `content` nor `lines` is provided, or if content is empty.
-pub fn render(diagram: &FreeformDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
-    let raw_lines: Vec<&str> = if let Some(content) = &diagram.content {
-        content.lines().collect()
+pub(crate) fn render(diagram: &FreeformDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+    let raw_lines: Vec<String> = if let Some(content) = &diagram.content {
+        let unescaped = unescape_ansi(content);
+        unescaped.lines().map(String::from).collect()
     } else if let Some(lines) = &diagram.lines {
-        lines.iter().map(String::as_str).collect()
+        lines.iter().map(|l| unescape_ansi(l)).collect()
     } else {
         return Err("freeform requires 'content' or 'lines' field".to_string());
     };

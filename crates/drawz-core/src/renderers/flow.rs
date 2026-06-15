@@ -7,7 +7,7 @@ use crate::schema::{FlowDiagram, FlowStep};
 /// # Errors
 ///
 /// Returns an error if no steps or nodes are provided.
-pub fn render(diagram: &FlowDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(diagram: &FlowDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
     if let Some(steps) = &diagram.steps {
         if steps.is_empty() {
             return Err("flow requires at least one step".to_string());

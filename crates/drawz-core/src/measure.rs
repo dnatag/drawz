@@ -2,6 +2,7 @@ use unicode_width::UnicodeWidthChar;
 
 /// Display width of a string, skipping ANSI escape sequences.
 /// CJK = 2, normal = 1, combining = 0.
+/// Handles ZWJ sequences (width 2), flag pairs (width 2), and variation selectors (width 0).
 #[must_use]
 pub fn display_width(s: &str) -> usize {
     let mut width = 0;
@@ -17,11 +18,48 @@ pub fn display_width(s: &str) -> usize {
                     }
                 }
             }
+        } else if c == '\u{FE0E}' || c == '\u{FE0F}' {
+            // Variation selectors: width 0
+        } else if is_regional_indicator(c) {
+            // Consume pair as single flag (width 2)
+            if chars.peek().is_some_and(|&n| is_regional_indicator(n)) {
+                chars.next();
+            }
+            width += 2;
         } else {
-            width += c.width().unwrap_or(0);
+            let cw = c.width().unwrap_or(0);
+            width += cw;
+            // If this char starts a ZWJ sequence, consume joined chars without adding width
+            if cw > 0 {
+                loop {
+                    // Skip variation selectors
+                    while chars.peek() == Some(&'\u{FE0E}') || chars.peek() == Some(&'\u{FE0F}') {
+                        chars.next();
+                    }
+                    if chars.peek() == Some(&'\u{200D}') {
+                        chars.next(); // consume ZWJ
+                        // Skip variation selectors after ZWJ
+                        while chars.peek() == Some(&'\u{FE0E}') || chars.peek() == Some(&'\u{FE0F}') {
+                            chars.next();
+                        }
+                        // Consume joined char (don't add its width)
+                        if let Some(&next) = chars.peek() {
+                            if next != '\x1b' && next.width().unwrap_or(0) > 0 {
+                                chars.next();
+                            }
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
         }
     }
     width
+}
+
+fn is_regional_indicator(c: char) -> bool {
+    ('\u{1F1E6}'..='\u{1F1FF}').contains(&c)
 }
 
 /// Pad string with spaces to reach exact target display width.
@@ -48,9 +86,11 @@ pub fn truncate(s: &str, max_width: usize) -> String {
     let mut result = String::new();
     let mut chars = s.chars().peekable();
     let ellipsis_width = 1;
+    let mut in_ansi = false;
 
     while let Some(c) = chars.next() {
         if c == '\x1b' {
+            in_ansi = true;
             result.push(c);
             if chars.peek() == Some(&'[') {
                 result.push('[');
@@ -70,12 +110,12 @@ pub fn truncate(s: &str, max_width: usize) -> String {
             if width + ellipsis_width <= max_width {
                 result.push('…');
             }
+            if in_ansi { result.push_str("\x1b[0m"); }
             return result;
         }
         if width + cw + ellipsis_width > max_width && chars.peek().is_some() {
-            // This char fits, but no room for ellipsis after it — and there ARE more chars.
-            // Use ellipsis now instead of this char.
             result.push('…');
+            if in_ansi { result.push_str("\x1b[0m"); }
             return result;
         }
         width += cw;
@@ -226,5 +266,23 @@ mod tests {
     fn pad_right_width_1() {
         let result = pad_right("hello", 1);
         assert_eq!(display_width(&result), 1);
+    }
+
+    #[test]
+    fn zwj_family_emoji() {
+        // 👨‍👩‍👧‍👦 = single glyph, width 2
+        assert_eq!(display_width("\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466}"), 2);
+    }
+
+    #[test]
+    fn flag_emoji() {
+        // 🇩🇪 = single flag, width 2
+        assert_eq!(display_width("\u{1F1E9}\u{1F1EA}"), 2);
+    }
+
+    #[test]
+    fn variation_selector() {
+        // ❤️ with VS16 — base ❤ is width 1
+        assert_eq!(display_width("\u{2764}\u{FE0F}"), 1);
     }
 }

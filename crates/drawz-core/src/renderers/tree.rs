@@ -7,7 +7,7 @@ use crate::schema::{TreeDiagram, TreeNode};
 /// # Errors
 ///
 /// Returns an error if neither `indent` nor `root` is provided.
-pub fn render(diagram: &TreeDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(diagram: &TreeDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
     let lines = if let Some(indent) = &diagram.indent {
         render_indent(indent, ctx)
     } else if let Some(root) = &diagram.root {
@@ -25,6 +25,7 @@ pub fn render(diagram: &TreeDiagram, ctx: &mut RenderContext) -> Result<Vec<Stri
 
 /// Parse indent-based text into tree lines with connectors.
 fn render_indent(text: &str, ctx: &mut RenderContext) -> Vec<String> {
+    let text = text.replace("\\n", "\n").replace("\\t", "\t");
     let raw: Vec<&str> = text.lines().collect();
     if raw.is_empty() {
         return Vec::new();

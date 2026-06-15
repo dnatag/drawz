@@ -7,7 +7,7 @@ use crate::schema::StateDiagram;
 /// # Errors
 ///
 /// Returns an error if transitions are empty.
-pub fn render(diagram: &StateDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(diagram: &StateDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
     if diagram.transitions.is_empty() {
         return Err("state diagram requires at least one transition".to_string());
     }
@@ -37,13 +37,23 @@ pub fn render(diagram: &StateDiagram, ctx: &mut RenderContext) -> Result<Vec<Str
         let box_lines = render_state_box(state, ctx);
         lines.extend(box_lines);
 
-        // Find transition from this state
+        // Render self-loop transitions for this state
+        for t in diagram.transitions.iter().filter(|t| t.from == state && t.to == state) {
+            let label = t.label.as_deref().unwrap_or("");
+            let arrow = format!("  ↺ {label}");
+            lines.push(fit_line(&arrow, ctx));
+        }
+
+        // Find transition from this state to the next
         if i < state_labels.len() - 1 {
-            let transition = diagram.transitions.iter().find(|t| {
-                t.from == state && state_labels.get(i + 1).is_some_and(|&next| t.to == next)
+            let next_state = state_labels[i + 1];
+
+            // Transition to next state in linear order (label on connector)
+            let to_next = diagram.transitions.iter().find(|t| {
+                t.from == state && t.to == next_state
             });
 
-            if let Some(t) = transition {
+            if let Some(t) = to_next {
                 if let Some(label) = &t.label {
                     let arrow = format!("  │ {label}");
                     lines.push(fit_line(&arrow, ctx));
@@ -53,7 +63,34 @@ pub fn render(diagram: &StateDiagram, ctx: &mut RenderContext) -> Result<Vec<Str
             } else {
                 lines.push(fit_line("  │", ctx));
             }
+
+            // Branching transitions to other states (not next, not self)
+            for t in diagram.transitions.iter().filter(|t| {
+                t.from == state && t.to != state && t.to != next_state
+            }) {
+                let label = t.label.as_deref().unwrap_or("");
+                let branch = if label.is_empty() {
+                    format!("  │ → {}", t.to)
+                } else {
+                    format!("  │ {} → {}", label, t.to)
+                };
+                lines.push(fit_line(&branch, ctx));
+            }
+
             lines.push(fit_line("  ▼", ctx));
+        } else {
+            // Last state: show branching transitions (not self)
+            for t in diagram.transitions.iter().filter(|t| {
+                t.from == state && t.to != state
+            }) {
+                let label = t.label.as_deref().unwrap_or("");
+                let branch = if label.is_empty() {
+                    format!("  │ → {}", t.to)
+                } else {
+                    format!("  │ {} → {}", label, t.to)
+                };
+                lines.push(fit_line(&branch, ctx));
+            }
         }
     }
 
@@ -137,6 +174,25 @@ mod tests {
     fn should_return_error_when_transitions_empty() {
         let d = StateDiagram { title: None, states: None, transitions: vec![] };
         assert!(render(&d, &mut ctx(30)).is_err());
+    }
+
+    #[test]
+    fn should_show_branching_transitions_when_state_has_multiple_targets() {
+        let d = StateDiagram {
+            title: None, states: None,
+            transitions: vec![
+                Edge { from: "A".into(), to: "B".into(), label: Some("x".into()) },
+                Edge { from: "A".into(), to: "C".into(), label: Some("y".into()) },
+                Edge { from: "A".into(), to: "D".into(), label: Some("z".into()) },
+                Edge { from: "B".into(), to: "C".into(), label: None },
+            ],
+        };
+        let lines = render(&d, &mut ctx(30)).unwrap();
+        // All branching labels should appear
+        assert!(lines.iter().any(|l| l.contains('x')));
+        assert!(lines.iter().any(|l| l.contains("y → C")));
+        assert!(lines.iter().any(|l| l.contains("z → D")));
+        for l in &lines { assert_eq!(display_width(l), 30); }
     }
 
     #[test]

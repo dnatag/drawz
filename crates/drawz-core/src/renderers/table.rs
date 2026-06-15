@@ -7,7 +7,7 @@ use crate::schema::TableDiagram;
 /// # Errors
 ///
 /// Returns an error if headers are empty or the table cannot fit at the given width.
-pub fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
     if diagram.headers.is_empty() {
         return Err("table requires at least one header".to_string());
     }
@@ -60,7 +60,8 @@ pub fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<Vec<Str
                 excess -= reduce;
             }
         }
-        if truncated {
+        let final_sum: usize = col_widths.iter().sum();
+        if truncated || final_sum > available {
             ctx.warnings.push("suggestion: reduce columns or set wider width".to_string());
         }
     }
@@ -96,12 +97,17 @@ pub fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<Vec<Str
     Ok(lines)
 }
 
+fn unescape_cell(s: &str) -> String {
+    s.replace("\\n", " ").replace("\\t", " ")
+}
+
 fn fit_cell(content: &str, width: usize) -> String {
-    let w = display_width(content);
+    let content = unescape_cell(content);
+    let w = display_width(&content);
     if w <= width {
-        pad_right(content, width)
+        pad_right(&content, width)
     } else {
-        truncate(content, width)
+        truncate(&content, width)
     }
 }
 

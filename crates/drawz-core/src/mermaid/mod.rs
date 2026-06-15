@@ -11,7 +11,9 @@ use crate::schema::{
 ///
 /// Returns an error if the Mermaid syntax is unrecognized or unsupported.
 pub fn parse(code: &str) -> Result<Diagram, String> {
-    let trimmed = code.trim();
+    // Handle literal \n (backslash-n) that arrives from JSON transport
+    let normalized = code.replace("\\n", "\n");
+    let trimmed = normalized.trim();
 
     if trimmed.starts_with("graph ") || trimmed.starts_with("flowchart ") {
         parse_flowchart(trimmed)
@@ -64,7 +66,7 @@ fn parse_flowchart(code: &str) -> Result<Diagram, String> {
     }))
 }
 
-/// Parse flow statement like `A-->B`, `A-->|label|B`, `A[Label]`.
+/// Parse flow statement like `A-->B`, `A-->|label|B`, `A[Label]`, `A-->B-->C`.
 fn parse_flow_statement(stmt: &str, nodes: &mut Vec<Node>, edges: &mut Vec<Edge>) {
     // Try to match edge patterns: A-->B, A-->|label|B, A---B, A==>B
     let arrow_patterns = ["-->|", "==>|", "-.->", "-->", "---", "==>"];
@@ -88,20 +90,45 @@ fn parse_flow_statement(stmt: &str, nodes: &mut Vec<Node>, edges: &mut Vec<Edge>
                 (None, rest.trim().to_string())
             };
 
+            // Extract immediate target node (before any chained arrow)
+            let immediate = extract_immediate_node(&target);
             let from_id = extract_node_id(left);
-            let to_id = extract_node_id(&target);
+            let to_id = extract_node_id(&immediate);
 
-            // Register node labels if bracket syntax used
             register_node(left, nodes);
-            register_node(&target, nodes);
-
+            register_node(&immediate, nodes);
             edges.push(Edge { from: from_id, to: to_id, label });
+
+            // Recursively parse chained remainder (e.g., B-->C from A-->B-->C)
+            if immediate.len() < target.len() {
+                parse_flow_statement(&target, nodes, edges);
+            }
             return;
         }
     }
 
     // No arrow found — it's a node declaration like `A[Label]`
     register_node(stmt, nodes);
+}
+
+/// Extract the immediate node from a potentially chained string like `B-->C`.
+fn extract_immediate_node(s: &str) -> String {
+    let s = s.trim();
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'[' | b'(' | b'{' => {
+                let close = match bytes[i] { b'[' => b']', b'(' => b')', _ => b'}' };
+                i += 1;
+                while i < bytes.len() && bytes[i] != close { i += 1; }
+                if i < bytes.len() { i += 1; }
+            }
+            b'-' | b'=' | b'.' => return s[..i].to_string(),
+            _ => i += 1,
+        }
+    }
+    s.to_string()
 }
 
 /// Extract node ID from `A[Label]` → `A`, or plain `A` → `A`.
@@ -232,10 +259,10 @@ fn parse_state(code: &str) -> Result<Diagram, String> {
 }
 
 fn skip_first_line(code: &str) -> &str {
-    // Skip first line, or after first `;`
-    if let Some(pos) = code.find('\n') {
-        &code[pos + 1..]
-    } else if let Some(pos) = code.find(';') {
+    // Find end of the declaration keyword (e.g., "graph LR", "flowchart TD", "sequenceDiagram")
+    // Everything after it (on the same line or subsequent lines) is body.
+    // The declaration ends at the first newline or semicolon.
+    if let Some(pos) = code.find(['\n', ';']) {
         &code[pos + 1..]
     } else {
         ""

@@ -9,7 +9,7 @@ use crate::schema::DagDiagram;
 /// # Errors
 ///
 /// Returns an error if edges are empty and no nodes provided.
-pub fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
     if diagram.edges.is_empty() && diagram.nodes.is_none() {
         return Err("dag requires at least one edge or node".to_string());
     }
@@ -33,25 +33,47 @@ pub fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Vec<Strin
         }
     }
 
-    // Topological sort via Kahn's algorithm
-    let layers = topo_layers(&node_ids, &diagram.edges);
+    let components = connected_components(&node_ids, &diagram.edges);
 
     let mut lines = Vec::new();
 
-    for (layer_idx, layer) in layers.iter().enumerate() {
-        // Render nodes in this layer as a row of boxes
-        let labels: Vec<&str> = layer
-            .iter()
-            .map(|&id| get_label(id, diagram))
+    for (comp_idx, component) in components.iter().enumerate() {
+        let comp_edges: Vec<&crate::schema::Edge> = diagram.edges.iter()
+            .filter(|e| component.contains(&e.from.as_str()) || component.contains(&e.to.as_str()))
             .collect();
-        let layer_lines = render_layer(&labels, ctx);
-        lines.extend(layer_lines);
 
-        // Arrow to next layer (if not last)
-        if layer_idx < layers.len() - 1 {
-            lines.push(fit_line("  │", ctx));
-            lines.push(fit_line("  ▼", ctx));
+        let (layers, cyclic) = topo_layers(component, &comp_edges);
+
+        if !cyclic.is_empty() {
+            let names = cyclic.join(", ");
+            return Err(format!("cycle detected among nodes: {names}"));
         }
+
+        if layers.is_empty() {
+            continue;
+        }
+
+        if comp_idx > 0 {
+            lines.push(fit_line("", ctx));
+        }
+
+        for (layer_idx, layer) in layers.iter().enumerate() {
+            let labels: Vec<&str> = layer
+                .iter()
+                .map(|&id| get_label(id, diagram))
+                .collect();
+            let layer_lines = render_layer(&labels, ctx);
+            lines.extend(layer_lines);
+
+            if layer_idx < layers.len() - 1 {
+                lines.push(fit_line("  │", ctx));
+                lines.push(fit_line("  ▼", ctx));
+            }
+        }
+    }
+
+    if lines.is_empty() {
+        return Err("dag has no renderable layers".to_string());
     }
 
     Ok(lines)
@@ -68,12 +90,45 @@ fn get_label<'a>(id: &'a str, diagram: &'a DagDiagram) -> &'a str {
     }
 }
 
+/// Group nodes into connected components (treating edges as undirected).
+fn connected_components<'a>(nodes: &[&'a str], edges: &[crate::schema::Edge]) -> Vec<Vec<&'a str>> {
+    fn find(parent: &mut Vec<usize>, i: usize) -> usize {
+        if parent[i] != i { parent[i] = find(parent, parent[i]); }
+        parent[i]
+    }
+
+    let n = nodes.len();
+    let mut parent: Vec<usize> = (0..n).collect();
+
+    for e in edges {
+        let Some(a) = nodes.iter().position(|&nd| nd == e.from) else { continue };
+        let Some(b) = nodes.iter().position(|&nd| nd == e.to) else { continue };
+        let ra = find(&mut parent, a);
+        let rb = find(&mut parent, b);
+        if ra != rb { parent[ra] = rb; }
+    }
+
+    let mut groups: std::collections::HashMap<usize, Vec<&'a str>> = std::collections::HashMap::new();
+    for (i, &node) in nodes.iter().enumerate() {
+        let root = find(&mut parent, i);
+        groups.entry(root).or_default().push(node);
+    }
+
+    // Stable order: sort by the index of the first node in each group
+    let mut components: Vec<Vec<&'a str>> = groups.into_values().collect();
+    components.sort_by_key(|c| nodes.iter().position(|&n| n == c[0]).unwrap_or(0));
+    components
+}
+
 /// Topological layering: nodes with no incoming edges go to layer 0, etc.
-fn topo_layers<'a>(nodes: &[&'a str], edges: &[crate::schema::Edge]) -> Vec<Vec<&'a str>> {
+/// Returns (layers, `cyclic_nodes`).
+fn topo_layers<'a>(nodes: &[&'a str], edges: &[&crate::schema::Edge]) -> (Vec<Vec<&'a str>>, Vec<&'a str>) {
     let mut in_degree: Vec<usize> = vec![0; nodes.len()];
     for e in edges {
-        if let Some(to_idx) = nodes.iter().position(|&n| n == e.to) {
-            in_degree[to_idx] += 1;
+        if e.from != e.to {
+            if let Some(to_idx) = nodes.iter().position(|&n| n == e.to) {
+                in_degree[to_idx] += 1;
+            }
         }
     }
 
@@ -89,16 +144,7 @@ fn topo_layers<'a>(nodes: &[&'a str], edges: &[crate::schema::Edge]) -> Vec<Vec<
             .collect();
 
         if layer.is_empty() {
-            // Remaining nodes have cycles — emit them as final layer
-            let cyclic: Vec<&'a str> = nodes
-                .iter()
-                .enumerate()
-                .filter(|&(i, _)| remaining[i])
-                .map(|(_, &n)| n)
-                .collect();
-            if !cyclic.is_empty() {
-                layers.push(cyclic);
-            }
+            // Remaining nodes have cycles — this is not a valid DAG
             break;
         }
 
@@ -118,7 +164,14 @@ fn topo_layers<'a>(nodes: &[&'a str], edges: &[crate::schema::Edge]) -> Vec<Vec<
         layers.push(layer);
     }
 
-    layers
+    let cyclic: Vec<&'a str> = nodes
+        .iter()
+        .enumerate()
+        .filter(|&(i, _)| remaining[i])
+        .map(|(_, &n)| n)
+        .collect();
+
+    (layers, cyclic)
 }
 
 fn render_layer(
@@ -227,5 +280,29 @@ mod tests {
         assert!(lines.iter().any(|l| l.contains("Start")));
         assert!(lines.iter().any(|l| l.contains("End")));
         for l in &lines { assert_eq!(display_width(l), 30); }
+    }
+
+    #[test]
+    fn should_render_disconnected_components_separately() {
+        let d = DagDiagram {
+            title: None, nodes: None,
+            edges: vec![
+                Edge { from: "A".into(), to: "B".into(), label: None },
+                Edge { from: "C".into(), to: "D".into(), label: None },
+                Edge { from: "E".into(), to: "F".into(), label: None },
+            ],
+        };
+        let lines = render(&d, &mut ctx(40)).unwrap();
+        // Each component should be rendered separately — A and C should NOT be in the same box
+        let has_a_c_together = lines.iter().any(|l| l.contains('A') && l.contains('C'));
+        assert!(!has_a_c_together, "A and C should not be in the same box");
+        // Each source should appear with its own sink
+        assert!(lines.iter().any(|l| l.contains('A')));
+        assert!(lines.iter().any(|l| l.contains('B')));
+        assert!(lines.iter().any(|l| l.contains('C')));
+        assert!(lines.iter().any(|l| l.contains('D')));
+        assert!(lines.iter().any(|l| l.contains('E')));
+        assert!(lines.iter().any(|l| l.contains('F')));
+        for l in &lines { assert_eq!(display_width(l), 40); }
     }
 }

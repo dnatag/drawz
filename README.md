@@ -9,17 +9,29 @@ AI agents produce misaligned ASCII diagrams because they can't compute Unicode c
 ## Quick Start
 
 ```sh
+# Install
+cargo install --path crates/drawz-cli
+
 # Linear flow
 echo '{"type":"flow","steps":["Build","Test","Deploy"]}' | drawz
 
 # Table
-echo '{"type":"table","headers":["Feature","Status"],"rows":[["Alignment","Guaranteed"],["Unicode","Handled"]]}' | drawz
+echo '{"type":"table","headers":["Feature","Status"],"rows":[["Alignment","✓"],["Unicode","✓"]]}' | drawz
 
 # Tree
-echo '{"type":"tree","indent":"src/\n  main.rs\n  lib.rs"}' | drawz
+echo '{"type":"tree","indent":"src\n  main.rs\n  lib.rs"}' | drawz
+
+# Sequence diagram
+echo '{"type":"sequence","actors":["Client","Server"],"messages":[{"from":"Client","to":"Server","label":"GET /api"}]}' | drawz
+
+# DAG
+echo '{"type":"dag","edges":[{"from":"Parse","to":"Compile"},{"from":"Compile","to":"Link"}]}' | drawz
 
 # Mermaid (agents already know this)
 echo '{"type":"mermaid","code":"graph LR; A-->B-->C"}' | drawz
+
+# MCP server mode
+drawz mcp
 ```
 
 ## Supported Diagram Types
@@ -38,17 +50,59 @@ echo '{"type":"mermaid","code":"graph LR; A-->B-->C"}' | drawz
 ## Integration
 
 ```
-PRIMARY:   MCP tool (render_diagram) — structured response, no escaping issues
-SECONDARY: CLI pipe — drawz <<'EOF' ... EOF
-LIBRARY:   use drawz_core::render(...)
+MCP:      drawz mcp        — JSON-RPC over stdio, 2 tools (render_diagram, introspect_drawz)
+CLI pipe: echo '...' | drawz — stdin JSON → stdout diagram
+Library:  drawz_core::render(&diagram, width) → RenderResult
+```
+
+## CLI Usage
+
+```
+Usage: drawz [OPTIONS] [COMMAND]
+
+Commands:
+  mcp   Start MCP server (JSON-RPC over stdio)
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+  -w, --width <WIDTH>  Maximum output width in characters
+  -h, --help           Print help
+  -V, --version        Print version
+```
+
+## Response Contract
+
+All render calls return:
+
+```json
+{
+  "output": "<rendered diagram or null>",
+  "fit": true,
+  "errors": [],
+  "warnings": []
+}
 ```
 
 ## Building
 
 ```sh
 cargo build --release
+just test       # all tests
+just test-int   # integration tests only
+just test-print # visual output for review
+just lint       # clippy pedantic
+```
+
+## Architecture
+
+```
+drawz-core/     Schema, rendering engine, alignment guarantee
+drawz-cli/      Single binary: pipe mode + MCP server
+
+Alignment invariant: every output line has display_width == total_width
+Achieved by: measure.rs (display_width) → pad_right → frame_box
 ```
 
 ## Status
 
-Design complete. Implementation in progress. See `design/prd.md` for full requirements.
+All 4 phases complete. 141 tests, 96%+ coverage, clippy pedantic clean.

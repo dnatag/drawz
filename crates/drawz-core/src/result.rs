@@ -14,11 +14,11 @@ pub struct RenderResult {
 }
 
 /// Mutable context threaded through rendering.
-pub struct RenderContext {
+pub(crate) struct RenderContext {
     /// Available width for content (excluding frame borders if framed).
-    pub inner_width: usize,
+    pub(crate) inner_width: usize,
     /// Total output width.
-    pub total_width: u16,
+    pub(crate) total_width: u16,
     /// Accumulated warnings.
-    pub warnings: Vec<String>,
+    pub(crate) warnings: Vec<String>,
 }

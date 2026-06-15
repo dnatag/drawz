@@ -137,7 +137,7 @@ pub struct Node {
     pub label: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Edge {
     pub from: String,
     pub to: String,

@@ -9,7 +9,7 @@ use crate::schema::SequenceDiagram;
 /// # Errors
 ///
 /// Returns an error if actors list is empty.
-pub fn render(diagram: &SequenceDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(diagram: &SequenceDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
     if diagram.actors.is_empty() {
         return Err("sequence diagram requires at least one actor".to_string());
     }
@@ -52,6 +52,10 @@ pub fn render(diagram: &SequenceDiagram, ctx: &mut RenderContext) -> Result<Vec<
 
         let msg_line = render_message(from, to, &msg.label, num_actors, col_width, ctx);
         lines.push(msg_line);
+        if from == to {
+            let ret_line = render_self_return(from, num_actors, col_width, ctx);
+            lines.push(ret_line);
+        }
         lines.push(lifeline.clone());
     }
 
@@ -111,12 +115,18 @@ fn render_message(
     }
 
     if from == to {
-        // Self-message
+        // Self-message: first line is ├─┐ label
         let c = from_center;
         if c < row.len() {
-            row[c] = '│';
+            row[c] = '├';
         }
-        let label_start = c + 2;
+        if c + 1 < row.len() {
+            row[c + 1] = '─';
+        }
+        if c + 2 < row.len() {
+            row[c + 2] = '┐';
+        }
+        let label_start = c + 4;
         let max_label = ctx.inner_width.saturating_sub(label_start);
         let fitted = if display_width(label) > max_label {
             truncate(label, max_label)
@@ -181,6 +191,29 @@ fn render_message(
     pad_right(s.trim_end(), ctx.inner_width)
 }
 
+fn render_self_return(from: usize, num_actors: usize, col_width: usize, ctx: &mut RenderContext) -> String {
+    let from_center = from * col_width + col_width / 2;
+    let mut row = vec![' '; ctx.inner_width];
+    for i in 0..num_actors {
+        let c = i * col_width + col_width / 2;
+        if c < row.len() && i != from {
+            row[c] = '│';
+        }
+    }
+    let c = from_center;
+    if c < row.len() {
+        row[c] = '◄';
+    }
+    if c + 1 < row.len() {
+        row[c + 1] = '─';
+    }
+    if c + 2 < row.len() {
+        row[c + 2] = '┘';
+    }
+    let s: String = row.into_iter().collect();
+    pad_right(s.trim_end(), ctx.inner_width)
+}
+
 fn fit_line(line: &str, ctx: &mut RenderContext) -> String {
     pad_right(line, ctx.inner_width)
 }
@@ -233,5 +266,20 @@ mod tests {
         let lines = render(&d, &mut ctx(20)).unwrap();
         assert!(lines.iter().any(|l| l.contains("Solo")));
         for l in &lines { assert_eq!(display_width(l), 20); }
+    }
+
+    #[test]
+    fn should_render_loopback_arrow_when_self_message() {
+        let d = SequenceDiagram {
+            title: None,
+            actors: vec!["A".into(), "B".into()],
+            messages: vec![Message { from: "A".into(), to: "A".into(), label: "tick".into() }],
+        };
+        let mut c = ctx(40);
+        let lines = render(&d, &mut c).unwrap();
+        assert!(lines.iter().any(|l| l.contains("├─┐")), "missing loopback top");
+        assert!(lines.iter().any(|l| l.contains("◄─┘")), "missing loopback bottom");
+        assert!(lines.iter().any(|l| l.contains("tick")), "missing label");
+        for l in &lines { assert_eq!(display_width(l), 40); }
     }
 }

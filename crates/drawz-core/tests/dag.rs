@@ -58,7 +58,9 @@ fn dag_cycle_handling() {
         ],
     });
     let result = render(&d, 30);
-    assert_aligned(&result, 30);
+    assert!(result.output.is_none());
+    assert!(!result.errors.is_empty());
+    assert!(result.errors[0].contains("cycle"));
 }
 
 #[test]
