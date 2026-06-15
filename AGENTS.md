@@ -42,14 +42,13 @@ drawz-cli/            Single binary: pipe mode + MCP server
 - **Minimum width = 4.** Rejected at top of `render()`.
 - **ANSI-safe truncation.** Truncated strings get `\x1b[0m` reset appended.
 
-## COMM Style
+## Agent Communication Style
 
-When explaining architecture or changes:
-
-- **Use `render_diagram` for all visual output.** Tables, trees, flows, sequences — never hand-draw them.
-- **Prefer diagrams over prose.** If it can be a table or flow, render it.
-- **Keep prose to one-liners** that annotate the rendered diagram.
-- **Name things concretely** — actual struct/function names, not abstractions.
+```
+- Use render_diagram for all visual output — tables, trees, flows, sequences, state machines, DAGs, freeform, and mermaid. Never hand-draw them.
+- Prefer diagrams over prose. If it can be a table or flow, render it.
+- Keep prose to one-liners that annotate the rendered diagram.
+```
 
 ## Tech Stack
 

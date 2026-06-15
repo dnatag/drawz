@@ -83,6 +83,46 @@ All render calls return:
 }
 ```
 
+## Agent Communication Style
+
+The `render_diagram` tool description teaches agents when and how to call drawz automatically via MCP. No system prompt changes are required for basic usage.
+
+To make agents **prefer diagrams over prose**, add these lines to your `AGENTS.md` or `CLAUDE.md`:
+
+```
+- Use render_diagram for all visual output — tables, trees, flows, sequences, state machines, DAGs, freeform, and mermaid. Never hand-draw them.
+- Prefer diagrams over prose. If it can be a table or flow, render it.
+- Keep prose to one-liners that annotate the rendered diagram.
+```
+
+### Installation
+
+```sh
+cargo install --path crates/drawz-cli
+```
+
+### MCP Setup
+
+Add to your MCP client configuration (e.g., Claude Desktop `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "drawz": {
+      "command": "drawz",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+### CLI Pipe Usage
+
+```sh
+echo '{"type":"flow","steps":["Build","Test","Deploy"]}' | drawz
+echo '{"type":"table","headers":["A","B"],"rows":[["1","2"]]}' | drawz -w 60
+```
+
 ## Building
 
 ```sh
