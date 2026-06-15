@@ -23,11 +23,15 @@ enum Command {
     Mcp,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     if let Some(Command::Mcp) = cli.command {
-        mcp::run();
+        if let Err(e) = mcp::run().await {
+            eprintln!("error: MCP server failed: {e}");
+            std::process::exit(1);
+        }
         return;
     }
 

@@ -1,163 +1,166 @@
-use std::io::{self, BufRead, Write};
+use std::sync::Arc;
 
-use serde::Deserialize;
+use async_trait::async_trait;
+use rust_mcp_sdk::{
+    error::SdkResult,
+    macros,
+    mcp_server::{server_runtime, McpServerOptions, ServerHandler},
+    schema::*,
+    *,
+};
+use serde::Serialize;
 use serde_json::{json, Value};
 
 use drawz_core::schema::DiagramInput;
 
-pub fn run() {
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
+// -- Tool definitions --
 
-    for line in stdin.lock().lines() {
-        let Ok(line) = line else { break };
+fn render_diagram_tool() -> Tool {
+    // No properties declared — schema is open-ended.
+    // Agents use the description and introspect_drawz for field guidance.
+    // This prevents strict MCP clients from stripping diagram-specific fields.
+    Tool {
+        name: "render_diagram".into(),
+        description: Some("Render a structured diagram as perfectly-aligned ASCII/Unicode art for terminal display. Accepts JSON with a 'type' field: freeform, mermaid, flow, table, tree, sequence, state, or dag. Pass all diagram-specific fields directly (e.g. steps, headers, rows, indent, code, actors, messages, transitions, edges, nodes, content). Call introspect_drawz for per-type field documentation and examples.".into()),
+        input_schema: ToolInputSchema::new(
+            vec!["type".into()],
+            None,
+            None,
+        ),
+        annotations: None,
+        execution: None,
+        icons: vec![],
+        meta: None,
+        output_schema: None,
+        title: None,
+    }
+}
 
-        if line.trim().is_empty() {
-            continue;
+#[macros::mcp_tool(
+    name = "introspect_drawz",
+    description = "List supported diagram types, show examples, and return the diagram type mapping table."
+)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, macros::JsonSchema)]
+pub struct IntrospectTool {}
+
+// -- Handler --
+
+#[derive(Default)]
+struct DrawzHandler;
+
+#[async_trait]
+impl ServerHandler for DrawzHandler {
+    async fn handle_list_tools_request(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _runtime: Arc<dyn McpServer>,
+    ) -> std::result::Result<ListToolsResult, RpcError> {
+        Ok(ListToolsResult {
+            tools: vec![render_diagram_tool(), IntrospectTool::tool()],
+            meta: None,
+            next_cursor: None,
+        })
+    }
+
+    async fn handle_call_tool_request(
+        &self,
+        params: CallToolRequestParams,
+        _runtime: Arc<dyn McpServer>,
+    ) -> std::result::Result<CallToolResult, CallToolError> {
+        match params.name.as_str() {
+            "render_diagram" => Ok(call_render(params.arguments)),
+            "introspect_drawz" => Ok(call_introspect()),
+            _ => Err(CallToolError::unknown_tool(params.name)),
         }
-
-        let request: JsonRpcRequest = match serde_json::from_str(&line) {
-            Ok(r) => r,
-            Err(e) => {
-                write_error(&mut stdout, None, &json!({"code": -32700, "message": format!("Parse error: {e}")}));
-                continue;
-            }
-        };
-
-        let result = handle_request(&request);
-        match result {
-            Some(Response::Success(v)) => write_success(&mut stdout, request.id.as_ref(), &v),
-            Some(Response::RpcError(v)) => write_error(&mut stdout, request.id.as_ref(), &v),
-            None => {} // notification — no response
-        }
     }
 }
 
-enum Response {
-    Success(Value),
-    RpcError(Value),
-}
+fn call_render(args: Option<serde_json::Map<String, Value>>) -> CallToolResult {
+    let args = Value::Object(args.unwrap_or_default());
 
-fn handle_request(req: &JsonRpcRequest) -> Option<Response> {
-    match req.method.as_str() {
-        "initialize" => Some(Response::Success(handle_initialize())),
-        "initialized" | "notifications/initialized" => None,
-        "tools/list" => Some(Response::Success(handle_tools_list())),
-        "tools/call" => Some(Response::Success(handle_tools_call(req.params.as_ref()))),
-        _ => Some(Response::RpcError(json!({"code": -32601, "message": format!("Method not found: {}", req.method)}))),
-    }
-}
-
-fn handle_initialize() -> Value {
-    json!({
-        "protocolVersion": "2024-11-05",
-        "capabilities": { "tools": {} },
-        "serverInfo": { "name": "drawz", "version": env!("CARGO_PKG_VERSION") }
-    })
-}
-
-fn handle_tools_list() -> Value {
-    json!({
-        "tools": [
-            {
-                "name": "render_diagram",
-                "description": "Render a structured diagram as perfectly-aligned ASCII/Unicode art for terminal display. Accepts JSON with a 'type' field: freeform, mermaid, flow, table, tree, sequence, state, or dag. Returns rendered output with fit/error metadata. Example: {\"type\":\"flow\",\"steps\":[\"Build\",\"Test\",\"Deploy\"]}",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "type": { "type": "string", "enum": ["freeform", "mermaid", "flow", "table", "tree", "sequence", "state", "dag"] },
-                        "width": { "type": "integer", "default": 80 },
-                        "title": { "type": "string" }
-                    },
-                    "required": ["type"],
-                    "additionalProperties": true
-                }
-            },
-            {
-                "name": "introspect_drawz",
-                "description": "List supported diagram types, show examples, and return the diagram type mapping table.",
-                "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
-            }
-        ]
-    })
-}
-
-fn handle_tools_call(params: Option<&Value>) -> Value {
-    let Some(params) = params else {
-        return tool_error("missing params");
-    };
-
-    let name = params.get("name").and_then(Value::as_str).unwrap_or("");
-    let arguments = params.get("arguments").cloned().unwrap_or(Value::Object(serde_json::Map::default()));
-
-    match name {
-        "render_diagram" => call_render_diagram(&arguments),
-        "introspect_drawz" => call_introspect(),
-        _ => tool_error(&format!("unknown tool: {name}")),
-    }
-}
-
-fn call_render_diagram(args: &Value) -> Value {
-    let input: DiagramInput = match serde_json::from_value(args.clone()) {
+    let input: DiagramInput = match serde_json::from_value(args) {
         Ok(d) => d,
         Err(e) => {
-            return tool_result(&json!({
-                "output": null, "fit": false,
-                "errors": [format!("invalid input: {e}")], "warnings": []
-            }));
+            let resp = RenderResponse {
+                output: None,
+                fit: false,
+                errors: vec![format!("invalid input: {e}")],
+                warnings: vec![],
+            };
+            return CallToolResult::text_content(vec![
+                serde_json::to_string(&resp).unwrap_or_default().into(),
+            ]);
         }
     };
 
     let result = drawz_core::render(&input.diagram, input.width);
-    tool_result(&json!({
-        "output": result.output, "fit": result.fit,
-        "errors": result.errors, "warnings": result.warnings
-    }))
+    let resp = RenderResponse {
+        output: result.output,
+        fit: result.fit,
+        errors: result.errors,
+        warnings: result.warnings,
+    };
+    CallToolResult::text_content(vec![
+        serde_json::to_string(&resp).unwrap_or_default().into(),
+    ])
 }
 
-fn call_introspect() -> Value {
-    tool_result(&json!({
+fn call_introspect() -> CallToolResult {
+    let resp = json!({
         "types": [
-            {"name": "freeform", "use_when": "Pre-formatted text, fix alignment", "minimal": "{\"type\":\"freeform\",\"content\":\"...\"}"},
-            {"name": "mermaid", "use_when": "Agent already has Mermaid code", "minimal": "{\"type\":\"mermaid\",\"code\":\"graph LR; A-->B\"}"},
-            {"name": "flow", "use_when": "Pipelines, request flows", "minimal": "{\"type\":\"flow\",\"steps\":[\"A\",\"B\",\"C\"]}"},
-            {"name": "table", "use_when": "Comparisons, option matrices", "minimal": "{\"type\":\"table\",\"headers\":[\"A\",\"B\"],\"rows\":[[\"1\",\"2\"]]}"},
-            {"name": "tree", "use_when": "File structures, hierarchies", "minimal": "{\"type\":\"tree\",\"indent\":\"src\\n  main.rs\"}"},
-            {"name": "sequence", "use_when": "API interactions, protocols", "minimal": "{\"type\":\"sequence\",\"actors\":[\"A\",\"B\"],\"messages\":[{\"from\":\"A\",\"to\":\"B\",\"label\":\"hi\"}]}"},
-            {"name": "state", "use_when": "State machines, lifecycles", "minimal": "{\"type\":\"state\",\"transitions\":[{\"from\":\"A\",\"to\":\"B\"}]}"},
-            {"name": "dag", "use_when": "Task dependencies, build graphs", "minimal": "{\"type\":\"dag\",\"edges\":[{\"from\":\"A\",\"to\":\"B\"}]}"}
+            {"name": "freeform", "use_when": "Pre-formatted text, fix alignment", "minimal": r#"{"type":"freeform","content":"line1\nline2"}"#},
+            {"name": "mermaid", "use_when": "Agent already has Mermaid code", "minimal": r#"{"type":"mermaid","code":"graph LR; A-->B"}"#},
+            {"name": "flow", "use_when": "Pipelines, request flows", "minimal": r#"{"type":"flow","steps":["A","B","C"]}"#, "fields": "steps: string[] | steps: [{label,steps}] (nested) | nodes: string[] or [{id?,label}] + edges: [{from,to,label?}]"},
+            {"name": "table", "use_when": "Comparisons, option matrices", "minimal": r#"{"type":"table","headers":["A","B"],"rows":[["1","2"]]}"#, "fields": "headers: string[], rows: string[][]"},
+            {"name": "tree", "use_when": "File structures, hierarchies", "minimal": r#"{"type":"tree","indent":"src\n  main.rs\n  lib.rs"}"#, "fields": "indent: string (2-space indented) | root: {label, children: [{label,children}]}"},
+            {"name": "sequence", "use_when": "API interactions, protocols", "minimal": r#"{"type":"sequence","actors":["A","B"],"messages":[{"from":"A","to":"B","label":"hi"}]}"#, "fields": "actors: string[], messages: [{from,to,label}]"},
+            {"name": "state", "use_when": "State machines, lifecycles", "minimal": r#"{"type":"state","transitions":[{"from":"A","to":"B","label":"go"}]}"#, "fields": "transitions: [{from,to,label?}], states?: string[] or [{id?,label}]"},
+            {"name": "dag", "use_when": "Task dependencies, build graphs", "minimal": r#"{"type":"dag","edges":[{"from":"A","to":"B"}]}"#, "fields": "edges: [{from,to,label?}], nodes?: string[] or [{id?,label}] (inferred from edges if omitted)"}
         ],
+        "common_fields": {"width": "integer, default 80", "title": "string, shown in frame header"},
         "version": env!("CARGO_PKG_VERSION")
-    }))
+    });
+    CallToolResult::text_content(vec![
+        serde_json::to_string(&resp).unwrap_or_default().into(),
+    ])
 }
 
-fn tool_result(content: &Value) -> Value {
-    json!({ "content": [{"type": "text", "text": serde_json::to_string(content).unwrap_or_default()}] })
+pub async fn run() -> SdkResult<()> {
+    let server_details = InitializeResult {
+        server_info: Implementation {
+            name: "drawz".into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+            title: None,
+            description: Some("Rendering guarantee layer for AI agent terminal output".into()),
+            icons: vec![],
+            website_url: None,
+        },
+        capabilities: ServerCapabilities {
+            tools: Some(ServerCapabilitiesTools { list_changed: None }),
+            ..Default::default()
+        },
+        protocol_version: ProtocolVersion::V2025_11_25.into(),
+        instructions: None,
+        meta: None,
+    };
+
+    let transport = StdioTransport::new(TransportOptions::default())?;
+    let handler = DrawzHandler.to_mcp_server_handler();
+    let server = server_runtime::create_server(McpServerOptions {
+        transport,
+        handler,
+        server_details,
+        task_store: None,
+        client_task_store: None,
+        message_observer: None,
+    });
+    server.start().await
 }
 
-fn tool_error(msg: &str) -> Value {
-    json!({ "isError": true, "content": [{"type": "text", "text": msg}] })
-}
-
-fn write_success(out: &mut impl Write, id: Option<&Value>, result: &Value) {
-    let response = json!({ "jsonrpc": "2.0", "id": id, "result": result });
-    let serialized = serde_json::to_string(&response).unwrap_or_default();
-    let _ = writeln!(out, "{serialized}");
-    let _ = out.flush();
-}
-
-fn write_error(out: &mut impl Write, id: Option<&Value>, error: &Value) {
-    let response = json!({ "jsonrpc": "2.0", "id": id, "error": error });
-    let serialized = serde_json::to_string(&response).unwrap_or_default();
-    let _ = writeln!(out, "{serialized}");
-    let _ = out.flush();
-}
-
-#[derive(Debug, Deserialize)]
-struct JsonRpcRequest {
-    #[allow(dead_code)]
-    jsonrpc: Option<String>,
-    id: Option<Value>,
-    method: String,
-    params: Option<Value>,
+#[derive(Serialize)]
+struct RenderResponse {
+    output: Option<String>,
+    fit: bool,
+    errors: Vec<String>,
+    warnings: Vec<String>,
 }
