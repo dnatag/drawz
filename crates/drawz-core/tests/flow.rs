@@ -223,3 +223,15 @@ fn narrow_width_all_types_still_align() {
         assert_and_print(label, &result, width);
     }
 }
+
+#[test]
+fn flow_empty_label_does_not_panic() {
+    let d = Diagram::Flow(FlowDiagram {
+        title: None,
+        steps: Some(vec![FlowStep::Label("".into()), FlowStep::Label("B".into())]),
+        nodes: None,
+        edges: None,
+    });
+    let result = render(&d, 30);
+    assert!(result.output.is_some() || !result.errors.is_empty());
+}

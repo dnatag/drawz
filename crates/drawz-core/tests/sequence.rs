@@ -128,3 +128,51 @@ fn sequence_long_label_in_message() {
     let result = render(&d, 30);
     assert_aligned(&result, 30);
 }
+
+#[test]
+fn sequence_title_rendering() {
+    let d = Diagram::Sequence(SequenceDiagram {
+        title: Some("Login Flow".into()),
+        actors: vec!["User".into(), "Server".into()],
+        messages: vec![Message { from: "User".into(), to: "Server".into(), label: "auth".into() }],
+    });
+    let result = render(&d, 50);
+    assert_aligned(&result, 50);
+    let output = result.output.unwrap();
+    assert!(output.contains("Login Flow"));
+}
+
+#[test]
+fn sequence_single_actor_no_messages() {
+    let d = Diagram::Sequence(SequenceDiagram {
+        title: None,
+        actors: vec!["Solo".into()],
+        messages: vec![],
+    });
+    let result = render(&d, 30);
+    assert_aligned(&result, 30);
+    let output = result.output.unwrap();
+    assert!(output.contains("Solo"));
+}
+
+#[test]
+fn sequence_duplicate_actors() {
+    let d = Diagram::Sequence(SequenceDiagram {
+        title: None,
+        actors: vec!["A".into(), "A".into(), "B".into()],
+        messages: vec![Message { from: "A".into(), to: "B".into(), label: "msg".into() }],
+    });
+    let result = render(&d, 40);
+    assert!(result.output.is_some() || !result.errors.is_empty());
+}
+
+#[test]
+fn sequence_minimum_width() {
+    let d = Diagram::Sequence(SequenceDiagram {
+        title: None,
+        actors: vec!["A".into(), "B".into()],
+        messages: vec![Message { from: "A".into(), to: "B".into(), label: "x".into() }],
+    });
+    let result = render(&d, 4);
+    assert!(result.output.is_some() || !result.errors.is_empty());
+}

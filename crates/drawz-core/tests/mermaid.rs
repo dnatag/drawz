@@ -195,3 +195,81 @@ fn mermaid_flowchart_thick_arrow() {
     let result = render(&d, 30);
     assert_aligned(&result, 30);
 }
+
+#[test]
+fn mermaid_title_passthrough() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: Some("My Flow".into()),
+        code: "graph LR\nA-->B".into(),
+    });
+    let result = render(&d, 40);
+    assert_aligned(&result, 40);
+    let output = result.output.unwrap();
+    assert!(output.contains("My Flow"));
+}
+
+#[test]
+fn mermaid_escaped_newline_handling() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "graph LR\\nA-->B\\nB-->C".into(),
+    });
+    let result = render(&d, 30);
+    assert_aligned(&result, 30);
+    let output = result.output.unwrap();
+    assert!(output.contains('A'));
+    assert!(output.contains('C'));
+}
+
+#[test]
+fn mermaid_chained_three_nodes() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "graph LR; A-->B-->C-->D".into(),
+    });
+    let result = render(&d, 40);
+    assert_aligned(&result, 40);
+    let output = result.output.unwrap();
+    assert!(output.contains('A'));
+    assert!(output.contains('D'));
+}
+
+#[test]
+fn mermaid_multiline_with_mixed_separators() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "graph TD\nA-->B;B-->C\nC-->D".into(),
+    });
+    let result = render(&d, 30);
+    assert_aligned(&result, 30);
+}
+
+#[test]
+fn mermaid_sequence_colon_in_label() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "sequenceDiagram\nA->>B: GET /api/v1:8080/users".into(),
+    });
+    let result = render(&d, 60);
+    assert_aligned(&result, 60);
+}
+
+#[test]
+fn mermaid_state_spaces_around_arrow() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "stateDiagram-v2\nA-->B\nC --> D\nE  -->  F".into(),
+    });
+    let result = render(&d, 30);
+    assert_aligned(&result, 30);
+}
+
+#[test]
+fn mermaid_flowchart_keyword_variants() {
+    for keyword in &["graph LR", "graph TD", "flowchart LR", "flowchart TD"] {
+        let code = format!("{keyword}\nA-->B");
+        let d = Diagram::Mermaid(MermaidDiagram { title: None, code });
+        let result = render(&d, 30);
+        assert_aligned(&result, 30);
+    }
+}

@@ -140,3 +140,66 @@ fn dag_diamond_dependency() {
     assert!(output.contains("Start"));
     assert!(output.contains("End"));
 }
+
+#[test]
+fn dag_edge_labels() {
+    let d = Diagram::Dag(DagDiagram {
+        title: None,
+        nodes: None,
+        edges: vec![
+            Edge { from: "A".into(), to: "B".into(), label: Some("depends".into()) },
+            Edge { from: "B".into(), to: "C".into(), label: Some("triggers".into()) },
+        ],
+    });
+    let result = render(&d, 40);
+    assert_aligned(&result, 40);
+}
+
+#[test]
+fn dag_title_rendering() {
+    let d = Diagram::Dag(DagDiagram {
+        title: Some("Deploy Pipeline".into()),
+        nodes: None,
+        edges: vec![Edge { from: "Build".into(), to: "Deploy".into(), label: None }],
+    });
+    let result = render(&d, 40);
+    assert_aligned(&result, 40);
+    let output = result.output.unwrap();
+    assert!(output.contains("Deploy Pipeline"));
+}
+
+#[test]
+fn dag_self_referencing_edge() {
+    let d = Diagram::Dag(DagDiagram {
+        title: None,
+        nodes: None,
+        edges: vec![Edge { from: "A".into(), to: "A".into(), label: None }],
+    });
+    let result = render(&d, 30);
+    assert!(result.output.is_some() || !result.errors.is_empty());
+}
+
+#[test]
+fn dag_duplicate_edges() {
+    let d = Diagram::Dag(DagDiagram {
+        title: None,
+        nodes: None,
+        edges: vec![
+            Edge { from: "A".into(), to: "B".into(), label: None },
+            Edge { from: "A".into(), to: "B".into(), label: None },
+        ],
+    });
+    let result = render(&d, 30);
+    assert!(result.output.is_some() || !result.errors.is_empty());
+}
+
+#[test]
+fn dag_minimum_width() {
+    let d = Diagram::Dag(DagDiagram {
+        title: None,
+        nodes: None,
+        edges: vec![Edge { from: "A".into(), to: "B".into(), label: None }],
+    });
+    let result = render(&d, 4);
+    assert!(result.output.is_some() || !result.errors.is_empty());
+}

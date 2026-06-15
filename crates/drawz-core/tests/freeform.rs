@@ -118,3 +118,20 @@ fn freeform_preserves_content_structure() {
     assert!(output.contains("Client"));
     assert!(output.contains("Server"));
 }
+
+#[test]
+fn freeform_width_below_minimum_rejected() {
+    let d = Diagram::Freeform(FreeformDiagram { title: None, content: Some("x".into()), lines: None });
+    for w in [0, 1, 2, 3] {
+        let result = render(&d, w);
+        assert!(!result.errors.is_empty(), "width {w} should be rejected");
+        assert!(result.output.is_none());
+    }
+}
+
+#[test]
+fn freeform_minimum_width() {
+    let d = Diagram::Freeform(FreeformDiagram { title: None, content: Some("hi".into()), lines: None });
+    let result = render(&d, 4);
+    assert!(result.output.is_some() || !result.errors.is_empty());
+}

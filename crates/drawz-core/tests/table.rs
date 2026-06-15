@@ -179,3 +179,18 @@ fn complex_table_many_columns() {
     assert!(output.contains("sequence"));
     assert_eq!(output.lines().count(), 9);
 }
+
+#[test]
+fn table_unicode_content_alignment() {
+    let d = Diagram::Table(TableDiagram {
+        title: None,
+        headers: vec!["Name".into(), "Status".into()],
+        rows: vec![
+            vec!["日本語".into(), "✓".into()],
+            vec!["café".into(), "⚡".into()],
+            vec!["🎉 party".into(), "ok".into()],
+        ],
+    });
+    let result = render(&d, 40);
+    assert_aligned(&result, 40);
+}
