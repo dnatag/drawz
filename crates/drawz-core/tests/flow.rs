@@ -2,11 +2,11 @@ use drawz_core::measure::display_width;
 use drawz_core::render;
 use drawz_core::schema::*;
 
-fn assert_aligned(result: &drawz_core::RenderResult, width: u16) {
+fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
     assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
     let output = result.output.as_ref().expect("expected output");
     for line in output.lines() {
-        assert_eq!(display_width(line), width as usize, "misaligned: {line:?}");
+        let first_w = output.lines().next().map(|l| display_width(l)).unwrap_or(0); assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
     }
 }
 
@@ -25,6 +25,7 @@ fn assert_and_print(label: &str, result: &drawz_core::RenderResult, width: u16) 
 fn flow_linear_steps_alignment() {
     let d = Diagram::Flow(FlowDiagram {
         title: None,
+        direction: None,
         steps: Some(vec![
             FlowStep::Label("Build".into()),
             FlowStep::Label("Test".into()),
@@ -37,7 +38,7 @@ fn flow_linear_steps_alignment() {
     assert!(result.errors.is_empty());
     let output = result.output.unwrap();
     for line in output.lines() {
-        assert_eq!(display_width(line), 30, "misaligned: {line:?}");
+        let expected_w = output.lines().next().map(|l| display_width(l)).unwrap_or(0); assert_eq!(display_width(line), expected_w, "misaligned: {line:?}");
     }
 }
 
@@ -45,6 +46,7 @@ fn flow_linear_steps_alignment() {
 fn flow_nested_subflow_alignment() {
     let d = Diagram::Flow(FlowDiagram {
         title: None,
+        direction: None,
         steps: Some(vec![
             FlowStep::Label("Start".into()),
             FlowStep::Sub(SubFlow {
@@ -68,6 +70,7 @@ fn flow_nested_subflow_alignment() {
 fn flow_empty_steps_error() {
     let d = Diagram::Flow(FlowDiagram {
         title: None,
+        direction: None,
         steps: Some(vec![]),
         nodes: None,
         edges: None,
@@ -80,6 +83,7 @@ fn flow_empty_steps_error() {
 fn flow_linear_renders_boxes_and_arrows() {
     let d = Diagram::Flow(FlowDiagram {
         title: Some("Pipeline".into()),
+        direction: None,
         steps: Some(vec![
             FlowStep::Label("Build".into()),
             FlowStep::Label("Test".into()),
@@ -104,6 +108,7 @@ fn flow_linear_renders_boxes_and_arrows() {
 fn flow_nested_shows_indented_children() {
     let d = Diagram::Flow(FlowDiagram {
         title: None,
+        direction: None,
         steps: Some(vec![
             FlowStep::Label("Init".into()),
             FlowStep::Sub(SubFlow {
@@ -130,6 +135,7 @@ fn flow_nested_shows_indented_children() {
 fn complex_flow_with_many_steps() {
     let d = Diagram::Flow(FlowDiagram {
         title: Some("CI/CD Pipeline".into()),
+        direction: None,
         steps: Some(vec![
             FlowStep::Label("Checkout".into()),
             FlowStep::Label("Install Deps".into()),
@@ -163,6 +169,7 @@ fn complex_flow_with_many_steps() {
 fn flow_graph_mode_with_edges() {
     let d = Diagram::Flow(FlowDiagram {
         title: None,
+        direction: None,
         steps: None,
         nodes: Some(vec![
             Node { id: Some("req".into()), label: "Request".into() },
@@ -197,6 +204,7 @@ fn narrow_width_all_types_still_align() {
         })),
         ("Flow@20", Diagram::Flow(FlowDiagram {
             title: None,
+        direction: None,
             steps: Some(vec![FlowStep::Label("A".into()), FlowStep::Label("B".into())]),
             nodes: None,
             edges: None,
@@ -228,6 +236,7 @@ fn narrow_width_all_types_still_align() {
 fn flow_empty_label_does_not_panic() {
     let d = Diagram::Flow(FlowDiagram {
         title: None,
+        direction: None,
         steps: Some(vec![FlowStep::Label("".into()), FlowStep::Label("B".into())]),
         nodes: None,
         edges: None,

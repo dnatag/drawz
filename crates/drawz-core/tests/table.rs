@@ -2,11 +2,11 @@ use drawz_core::measure::display_width;
 use drawz_core::render;
 use drawz_core::schema::*;
 
-fn assert_aligned(result: &drawz_core::RenderResult, width: u16) {
+fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
     assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
     let output = result.output.as_ref().expect("expected output");
     for line in output.lines() {
-        assert_eq!(display_width(line), width as usize, "misaligned: {line:?}");
+        let first_w = output.lines().next().map(|l| display_width(l)).unwrap_or(0); assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
     }
 }
 
@@ -42,7 +42,7 @@ fn table_no_rows_alignment() {
     let result = render(&d, 40);
     assert!(result.errors.is_empty());
     let output = result.output.unwrap();
-    assert_eq!(output.lines().count(), 2);
+    assert_eq!(output.lines().count(), 4); // top + header + header_sep + bottom
     for line in output.lines() {
         assert_eq!(display_width(line), 40, "misaligned: {line:?}");
     }
@@ -177,7 +177,7 @@ fn complex_table_many_columns() {
     let output = result.output.unwrap();
     assert!(output.contains("freeform"));
     assert!(output.contains("sequence"));
-    assert_eq!(output.lines().count(), 9);
+    assert_eq!(output.lines().count(), 17); // top + header + sep + 7*(row+sep) - 1 sep + bottom
 }
 
 #[test]

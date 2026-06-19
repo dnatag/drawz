@@ -18,18 +18,23 @@ drawz-core/           Schema, rendering engine, alignment guarantee
 ├── src/frame.rs       Box drawing (┌─┐│└─┘)
 ├── src/renderers/     Per-type rendering modules
 │   ├── freeform.rs    Pad-to-width text blocks
-│   ├── table.rs       Auto-sized columns, proportional shrink
-│   ├── tree.rs        Indent parsing + TreeNode recursion
-│   ├── flow.rs        Step boxes, dashed subflow frames, graph mode
+│   ├── table.rs       Grid-bordered tables (┌┬┐ ├┼┤ └┴┘)
+│   ├── tree.rs        Indent parsing (auto-detect 2/4-space) + TreeNode
+│   ├── flow.rs        Vertical + horizontal (LR) pipelines
 │   ├── state.rs       ╭─╮ rounded state boxes, labeled transitions
-│   ├── sequence.rs    Actor columns, lifeline arrows
-│   └── dag.rs         Kahn's topological layering
-└── src/mermaid/       Mermaid parser (subset → internal types)
-    └── mod.rs         flowchart, sequenceDiagram, stateDiagram
+│   ├── sequence.rs    Actor columns, lifeline arrows, truncation warnings
+│   └── dag.rs         ascii-dag Sugiyama layout (diamond, fan-out)
+└── src/mermaid/       Mermaid subset parser
+    ├── mod.rs         Module declarations + re-export
+    ├── parse.rs       Dispatch: flowchart → Flow/DAG, sequence, state
+    ├── helpers.rs     Shared: skip_first_line, split_statements
+    ├── flowchart.rs   graph/flowchart parser (LR→horizontal, branching→DAG)
+    ├── sequence.rs    sequenceDiagram parser
+    └── state.rs       stateDiagram parser
 
 drawz-cli/            Single binary: pipe mode + MCP server
 ├── src/main.rs        Clap CLI: drawz | drawz mcp
-└── src/mcp.rs         JSON-RPC stdio server (render_diagram + introspect_drawz)
+└── src/mcp.rs         rust-mcp-sdk server (render_diagram + introspect_drawz)
 ```
 
 ## Architecture Invariants
@@ -40,14 +45,20 @@ drawz-cli/            Single binary: pipe mode + MCP server
 - **No panics in library code.** No `unwrap()` in non-test code. Return errors in `RenderResult.errors`.
 - **Deterministic.** Same input + same width = same output, always.
 - **Minimum width = 4.** Rejected at top of `render()`.
-- **ANSI-safe truncation.** Truncated strings get `\x1b[0m` reset appended.
+- **fit: false when truncated.** All renderers push warnings and set fit=false when content is truncated.
 
-## Agent Communication Style
+## COMM Style
+
+The `render_diagram` tool description teaches agents when and how to call drawz automatically via MCP. No system prompt changes are required for basic usage.
+
+To make agents **prefer diagrams over prose**, add these lines to your `AGENTS.md` or `CLAUDE.md`:
 
 ```
 - Use render_diagram for all visual output — tables, trees, flows, sequences, state machines, DAGs, freeform, and mermaid. Never hand-draw them.
 - Prefer diagrams over prose. If it can be a table or flow, render it.
 - Keep prose to one-liners that annotate the rendered diagram.
+- For complex graphs with many nodes/edges, prefer type: "mermaid" with a code string over type: "dag" with verbose node/edge arrays.
+- Always display the rendered output in a code block — tool results may not be visible to the user automatically.
 ```
 
 ## Tech Stack
@@ -56,34 +67,24 @@ drawz-cli/            Single binary: pipe mode + MCP server
 |-------|--------|-----|
 | Schema | serde + serde_json | JSON deserialization with tagged enums |
 | Width | unicode-width 0.2 | CJK=2, combining=0, the alignment foundation |
+| DAG Layout | ascii-dag | Sugiyama algorithm, zero deps, diamond/fan-out |
 | CLI | clap 4 (derive) | Declarative argument parsing |
+| MCP | rust-mcp-sdk 0.9 | Protocol handling, stdio transport |
 | Rendering | Pure Rust | Predictable, fast compile, no runtime deps |
-| MCP | JSON-RPC stdio | Standard for local MCP servers |
 
 ## Testing Convention
 
 - **Unit tests:** inline `#[cfg(test)] mod tests` in source files
 - **Integration tests:** `tests/` directory, one file per diagram type
 - **Test names:** `should_<behavior>_when_<condition>`
-- **Happy-path tests:** include `assert_and_print` for visual review via `just test-print`
-
-## Key Design Docs
-
-| Doc | What it covers |
-|-----|---------------|
-| `design/prd.md` | Full requirements, input/output format, MCP design |
-| `design/high-level-design.md` | Module layout, data flow, alignment guarantee |
-| `design/adr/001-rendering-constraints.md` | Width rules, degradation strategies |
-| `design/adr/002-response-contract.md` | `{output, fit, errors, warnings}` contract |
-| `design/adr/003-mermaid-scope.md` | Mermaid subset parser decision |
+- **196 tests total**, clippy clean with `-D warnings -W clippy::perf`
 
 ## Useful Commands
 
 ```sh
-just test        # all 141 tests
-just test-int    # integration tests only
-just test-print  # visual output for human review
-just lint        # clippy pedantic
-just build       # release binary
-just install     # install to ~/.cargo/bin
+cargo test                # all 196 tests
+cargo test --test mermaid # single test file
+cargo clippy --all-targets -- -D warnings
+cargo build --release
+cargo install --path crates/drawz-cli
 ```

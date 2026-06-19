@@ -12,23 +12,23 @@ AI agents produce misaligned ASCII diagrams because they can't compute Unicode c
 # Install
 cargo install --path crates/drawz-cli
 
-# Linear flow
-echo '{"type":"flow","steps":["Build","Test","Deploy"]}' | drawz
+# Horizontal flow
+echo '{"type":"flow","direction":"LR","steps":["Build","Test","Deploy"]}' | drawz
 
-# Table
+# Table with grid borders
 echo '{"type":"table","headers":["Feature","Status"],"rows":[["Alignment","✓"],["Unicode","✓"]]}' | drawz
 
-# Tree
-echo '{"type":"tree","indent":"src\n  main.rs\n  lib.rs"}' | drawz
+# Tree (auto-detects 2-space or 4-space indent)
+echo '{"type":"tree","indent":"src\n  main.rs\n  lib.rs\n  utils/\n    helpers.rs"}' | drawz
+
+# DAG with Sugiyama layout (diamond, fan-out)
+echo '{"type":"dag","edges":[{"from":"Parse","to":"Lint"},{"from":"Parse","to":"Compile"},{"from":"Lint","to":"Link"},{"from":"Compile","to":"Link"}]}' | drawz
 
 # Sequence diagram
 echo '{"type":"sequence","actors":["Client","Server"],"messages":[{"from":"Client","to":"Server","label":"GET /api"}]}' | drawz
 
-# DAG
-echo '{"type":"dag","edges":[{"from":"Parse","to":"Compile"},{"from":"Compile","to":"Link"}]}' | drawz
-
-# Mermaid (agents already know this)
-echo '{"type":"mermaid","code":"graph LR; A-->B-->C"}' | drawz
+# Mermaid (LR = horizontal, TD = vertical, branching = DAG)
+echo '{"type":"mermaid","code":"graph LR; A[Parse]-->B[Layout]-->C[Render]-->D[Output]"}' | drawz
 
 # MCP server mode
 drawz mcp
@@ -38,14 +38,15 @@ drawz mcp
 
 | Type | Use Case | Minimal Input |
 |------|----------|---------------|
-| `freeform` | Pre-formatted text, fix alignment | `{"type":"freeform","content":"..."}` |
-| `mermaid` | Agent already has Mermaid code | `{"type":"mermaid","code":"..."}` |
+| `flow` | Pipelines, request flows | `{"type":"flow","steps":["A","B","C"]}` |
+| `flow` (LR) | Horizontal pipelines | `{"type":"flow","direction":"LR","steps":["A","B"]}` |
 | `table` | Comparisons, option matrices | `{"type":"table","headers":[...],"rows":[...]}` |
 | `tree` | File structures, hierarchies | `{"type":"tree","indent":"src/\n  main.rs"}` |
-| `flow` | Pipelines, request flows | `{"type":"flow","steps":["A","B","C"]}` |
-| `state` | State machines, lifecycles | `{"type":"state","transitions":[...]}` |
 | `sequence` | API interactions, protocols | `{"type":"sequence","actors":[...],"messages":[...]}` |
+| `state` | State machines, lifecycles | `{"type":"state","transitions":[...]}` |
 | `dag` | Task dependencies, build graphs | `{"type":"dag","edges":[...]}` |
+| `mermaid` | Agent already has Mermaid code | `{"type":"mermaid","code":"..."}` |
+| `freeform` | Fix alignment of hand-drawn text | `{"type":"freeform","content":"..."}` |
 
 ## Integration
 
@@ -81,7 +82,9 @@ All render calls return:
   "errors": [],
   "warnings": []
 }
-```
+
+- `fit: false` + warnings when content is truncated to fit width
+- `output: null` + errors when input is invalid
 
 ## Agent Communication Style
 
@@ -93,6 +96,8 @@ To make agents **prefer diagrams over prose**, add these lines to your `AGENTS.m
 - Use render_diagram for all visual output — tables, trees, flows, sequences, state machines, DAGs, freeform, and mermaid. Never hand-draw them.
 - Prefer diagrams over prose. If it can be a table or flow, render it.
 - Keep prose to one-liners that annotate the rendered diagram.
+- For complex graphs with many nodes/edges, prefer type: "mermaid" with a code string over type: "dag" with verbose node/edge arrays.
+- Always display the rendered output in a code block — tool results may not be visible to the user automatically.
 ```
 
 ### Installation
@@ -103,7 +108,7 @@ cargo install --path crates/drawz-cli
 
 ### MCP Setup
 
-Add to your MCP client configuration (e.g., Claude Desktop `claude_desktop_config.json`):
+Add to your MCP client configuration (e.g., Claude Desktop, Kiro, Cursor):
 
 ```json
 {
@@ -119,7 +124,7 @@ Add to your MCP client configuration (e.g., Claude Desktop `claude_desktop_confi
 ### CLI Pipe Usage
 
 ```sh
-echo '{"type":"flow","steps":["Build","Test","Deploy"]}' | drawz
+echo '{"type":"flow","direction":"LR","steps":["Build","Test","Deploy"]}' | drawz
 echo '{"type":"table","headers":["A","B"],"rows":[["1","2"]]}' | drawz -w 60
 ```
 
@@ -127,17 +132,20 @@ echo '{"type":"table","headers":["A","B"],"rows":[["1","2"]]}' | drawz -w 60
 
 ```sh
 cargo build --release
-just test       # all tests
-just test-int   # integration tests only
-just test-print # visual output for review
-just lint       # clippy pedantic
+cargo test              # all tests
+cargo clippy --all-targets -- -D warnings
 ```
 
 ## Architecture
 
 ```
 drawz-core/     Schema, rendering engine, alignment guarantee
-drawz-cli/      Single binary: pipe mode + MCP server
+drawz-cli/      Single binary: pipe mode + MCP server (rust-mcp-sdk)
+
+Key crates:
+  ascii-dag       Sugiyama DAG layout (diamond, fan-out, crossing reduction)
+  unicode-width   CJK=2, combining=0 (THE alignment foundation)
+  rust-mcp-sdk    MCP protocol handling (stdio transport)
 
 Alignment invariant: every output line has display_width == total_width
 Achieved by: measure.rs (display_width) → pad_right → frame_box
@@ -145,4 +153,5 @@ Achieved by: measure.rs (display_width) → pad_right → frame_box
 
 ## Status
 
-All 4 phases complete. 141 tests, 96%+ coverage, clippy pedantic clean.
+196 tests, clippy clean, all diagram types rendering correctly.
+```
