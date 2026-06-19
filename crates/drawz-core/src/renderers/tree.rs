@@ -31,14 +31,21 @@ fn render_indent(text: &str, ctx: &mut RenderContext) -> Vec<String> {
         return Vec::new();
     }
 
-    let entries: Vec<(usize, &str)> = raw
-        .iter()
-        .map(|line| {
-            let trimmed = line.trim_start();
-            let spaces = line.len() - trimmed.len();
-            (spaces / 2, trimmed)
-        })
-        .collect();
+    let entries: Vec<(usize, &str)> = {
+        // Auto-detect indent unit from first indented line
+        let indent_unit = raw.iter()
+            .map(|line| line.len() - line.trim_start().len())
+            .find(|&s| s > 0)
+            .unwrap_or(2);
+
+        raw.iter()
+            .map(|line| {
+                let trimmed = line.trim_start();
+                let spaces = line.len() - trimmed.len();
+                (spaces / indent_unit, trimmed)
+            })
+            .collect()
+    };
 
     let mut lines = Vec::new();
     render_indent_recursive(&entries, 0, entries.len(), "", ctx, &mut lines);
@@ -63,17 +70,35 @@ fn render_indent_recursive(
     let line = format!("{prefix}{}", entries[start].1);
     out.push(fit_line(&line, ctx));
 
-    // Collect direct children (entries at base_level + 1)
-    let mut children: Vec<(usize, usize)> = Vec::new();
-    let mut i = start + 1;
-    while i < end {
-        if entries[i].0 <= base_level {
-            break;
+    // Find the span of descendants (everything after root that is deeper)
+    let desc_end = {
+        let mut i = start + 1;
+        while i < end && entries[i].0 > base_level {
+            i += 1;
         }
-        if entries[i].0 == base_level + 1 {
+        i
+    };
+
+    render_children_indent(entries, start + 1, desc_end, base_level + 1, prefix, ctx, out);
+}
+
+fn render_children_indent(
+    entries: &[(usize, &str)],
+    start: usize,
+    end: usize,
+    child_level: usize,
+    prefix: &str,
+    ctx: &mut RenderContext,
+    out: &mut Vec<String>,
+) {
+    // Collect direct children at child_level
+    let mut children: Vec<(usize, usize)> = Vec::new();
+    let mut i = start;
+    while i < end {
+        if entries[i].0 == child_level {
             let cs = i;
             i += 1;
-            while i < end && entries[i].0 > base_level + 1 {
+            while i < end && entries[i].0 > child_level {
                 i += 1;
             }
             children.push((cs, i));
@@ -91,7 +116,7 @@ fn render_indent_recursive(
         out.push(fit_line(&line, ctx));
 
         let nested = format!("{prefix}{child_prefix}");
-        render_indent_recursive(entries, cs + 1, ce, &nested, ctx, out);
+        render_children_indent(entries, cs + 1, ce, child_level + 1, &nested, ctx, out);
     }
 }
 

@@ -1,7 +1,9 @@
 //! Diagram schema types — the JSON-to-Rust mapping.
 //!
-//! Fields are intentionally undocumented in rustdoc; they map 1:1 to JSON input
-//! fields documented in the PRD.
+//! Each struct maps 1:1 to a JSON input shape. The `Diagram` enum is
+//! discriminated by the `"type"` field via serde's tagged enum.
+//! Fields are self-documenting via their names and map directly to
+//! the JSON input format documented in the README.
 
 #![allow(missing_docs)]
 
@@ -17,7 +19,7 @@ pub struct DiagramInput {
     pub diagram: Diagram,
 }
 
-fn default_width() -> u16 { 80 }
+fn default_width() -> u16 { 120 }
 
 /// The diagram type, discriminated by the `type` field.
 #[derive(Debug, Deserialize)]
@@ -39,7 +41,10 @@ pub enum Diagram {
 #[derive(Debug, Deserialize)]
 pub struct FlowDiagram {
     pub title: Option<String>,
+    /// Direction: "LR" for horizontal, "TD"/"TB" for vertical (default)
+    pub direction: Option<String>,
     pub steps: Option<Vec<FlowStep>>,
+    #[serde(default, deserialize_with = "deserialize_nodes")]
     pub nodes: Option<Vec<Node>>,
     pub edges: Option<Vec<Edge>>,
 }
@@ -64,6 +69,7 @@ pub struct SubFlow {
 #[derive(Debug, Deserialize)]
 pub struct StateDiagram {
     pub title: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_nodes")]
     pub states: Option<Vec<Node>>,
     pub transitions: Vec<Edge>,
 }
@@ -110,6 +116,7 @@ pub struct TableDiagram {
 #[derive(Debug, Deserialize)]
 pub struct DagDiagram {
     pub title: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_nodes")]
     pub nodes: Option<Vec<Node>>,
     pub edges: Vec<Edge>,
 }
@@ -132,9 +139,33 @@ pub struct MermaidDiagram {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum NodeInput {
+    Object { id: Option<String>, label: String },
+    Label(String),
+}
+
+#[derive(Debug)]
 pub struct Node {
     pub id: Option<String>,
     pub label: String,
+}
+
+impl From<NodeInput> for Node {
+    fn from(input: NodeInput) -> Self {
+        match input {
+            NodeInput::Object { id, label } => Node { id, label },
+            NodeInput::Label(s) => Node { id: None, label: s },
+        }
+    }
+}
+
+fn deserialize_nodes<'de, D>(deserializer: D) -> Result<Option<Vec<Node>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt: Option<Vec<NodeInput>> = Option::deserialize(deserializer)?;
+    Ok(opt.map(|v| v.into_iter().map(Node::from).collect()))
 }
 
 #[derive(Debug, Clone, Deserialize)]

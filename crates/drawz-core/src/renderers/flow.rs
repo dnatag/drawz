@@ -8,20 +8,74 @@ use crate::schema::{FlowDiagram, FlowStep};
 ///
 /// Returns an error if no steps or nodes are provided.
 pub(crate) fn render(diagram: &FlowDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+    let is_horizontal = diagram.direction.as_deref().is_some_and(|d| d.eq_ignore_ascii_case("lr"));
+
     if let Some(steps) = &diagram.steps {
         if steps.is_empty() {
             return Err("flow requires at least one step".to_string());
         }
-        render_steps(steps, ctx, 0)
+        if is_horizontal {
+            let labels: Vec<&str> = steps.iter().filter_map(|s| match s {
+                FlowStep::Label(l) => Some(l.as_str()),
+                _ => None,
+            }).collect();
+            Ok(render_horizontal(&labels, ctx))
+        } else {
+            render_steps(steps, ctx, 0)
+        }
     } else if let Some(nodes) = &diagram.nodes {
         if nodes.is_empty() {
             return Err("flow requires at least one node".to_string());
         }
         let edges = diagram.edges.as_deref().unwrap_or(&[]);
-        Ok(render_graph(nodes, edges, ctx))
+        if is_horizontal {
+            let labels: Vec<&str> = nodes.iter().map(|n| n.label.as_str()).collect();
+            Ok(render_horizontal(&labels, ctx))
+        } else {
+            Ok(render_graph(nodes, edges, ctx))
+        }
     } else {
         Err("flow requires 'steps' or 'nodes' field".to_string())
     }
+}
+
+fn render_horizontal(labels: &[&str], _ctx: &mut RenderContext) -> Vec<String> {
+    let arrow = "───→";
+    let arrow_w = display_width(arrow);
+
+    // Render at natural size — each box is as wide as its label needs
+    let widths: Vec<usize> = labels.iter().map(|l| display_width(l) + 4).collect();
+    let total_w: usize = widths.iter().sum::<usize>() + (labels.len() - 1) * (arrow_w + 2);
+
+    // If total natural width exceeds inner_width, fall back to vertical
+    if total_w > _ctx.inner_width {
+        let steps: Vec<FlowStep> = labels.iter().map(|&l| FlowStep::Label(l.to_string())).collect();
+        return render_steps(&steps, _ctx, 0).unwrap_or_default();
+    }
+
+    // Build 3 lines: top borders, middle labels, bottom borders
+    let mut top_parts = Vec::new();
+    let mut mid_parts = Vec::new();
+    let mut bot_parts = Vec::new();
+
+    for (i, (&l, &w)) in labels.iter().zip(&widths).enumerate() {
+        top_parts.push(format!("┌{}┐", "─".repeat(w - 2)));
+        mid_parts.push(format!("│ {} │", l));
+        bot_parts.push(format!("└{}┘", "─".repeat(w - 2)));
+
+        if i < labels.len() - 1 {
+            top_parts.push(format!("{:^w$}", "", w = arrow_w + 2));
+            mid_parts.push(format!(" {arrow} "));
+            bot_parts.push(format!("{:^w$}", "", w = arrow_w + 2));
+        }
+    }
+
+    // Don't pad to ctx.inner_width — let natural size flow through
+    vec![
+        top_parts.join(""),
+        mid_parts.join(""),
+        bot_parts.join(""),
+    ]
 }
 
 fn render_steps(steps: &[FlowStep], ctx: &mut RenderContext, indent: usize) -> Result<Vec<String>, String> {
@@ -165,6 +219,7 @@ mod tests {
     fn should_render_boxes_and_arrows_when_linear_steps() {
         let d = FlowDiagram {
             title: None,
+            direction: None,
             steps: Some(vec![FlowStep::Label("A".into()), FlowStep::Label("B".into())]),
             nodes: None, edges: None,
         };
@@ -178,6 +233,7 @@ mod tests {
     fn should_render_dashed_frame_when_nested_subflow() {
         let d = FlowDiagram {
             title: None,
+            direction: None,
             steps: Some(vec![FlowStep::Sub(SubFlow {
                 label: "Parent".into(),
                 steps: vec![FlowStep::Label("Child".into())],
@@ -194,6 +250,7 @@ mod tests {
     fn should_render_edge_labels_when_graph_mode() {
         let d = FlowDiagram {
             title: None,
+            direction: None,
             steps: None,
             nodes: Some(vec![
                 Node { id: Some("a".into()), label: "Start".into() },
@@ -208,13 +265,13 @@ mod tests {
 
     #[test]
     fn should_return_error_when_steps_empty() {
-        let d = FlowDiagram { title: None, steps: Some(vec![]), nodes: None, edges: None };
+        let d = FlowDiagram { title: None, direction: None, steps: Some(vec![]), nodes: None, edges: None };
         assert!(render(&d, &mut ctx(30)).is_err());
     }
 
     #[test]
     fn should_return_error_when_no_steps_or_nodes() {
-        let d = FlowDiagram { title: None, steps: None, nodes: None, edges: None };
+        let d = FlowDiagram { title: None, direction: None, steps: None, nodes: None, edges: None };
         assert!(render(&d, &mut ctx(30)).is_err());
     }
 }

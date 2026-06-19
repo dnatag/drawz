@@ -13,6 +13,7 @@ fn unescape_ansi(s: &str) -> String {
 }
 
 /// Render freeform: pad each line to `inner_width`, fixing alignment.
+/// Validates box-drawing consistency and warns if hand-drawn boxes are misaligned.
 ///
 /// # Errors
 ///
@@ -31,12 +32,43 @@ pub(crate) fn render(diagram: &FreeformDiagram, ctx: &mut RenderContext) -> Resu
         return Err("freeform content is empty".to_string());
     }
 
+    // Validate box-drawing alignment
+    validate_box_alignment(&raw_lines, ctx);
+
     let out: Vec<String> = raw_lines
         .iter()
         .map(|line| pad_right(line, ctx.inner_width))
         .collect();
 
     Ok(out)
+}
+
+/// Detect misaligned box-drawing: if lines contain border characters,
+/// check that border lines match content line widths.
+fn validate_box_alignment(lines: &[String], ctx: &mut RenderContext) {
+    use crate::measure::display_width;
+
+    let box_chars = "┌┐└┘┬┴├┤┼─│═║╔╗╚╝╠╣╦╩╬";
+    let has_boxes = lines.iter().any(|l| l.chars().any(|c| box_chars.contains(c)));
+    if !has_boxes {
+        return;
+    }
+
+    // Check if all lines with box chars have consistent display widths
+    let box_line_widths: Vec<usize> = lines
+        .iter()
+        .filter(|l| l.chars().any(|c| box_chars.contains(c)))
+        .map(|l| display_width(l))
+        .collect();
+
+    if box_line_widths.len() >= 2 {
+        let first = box_line_widths[0];
+        if box_line_widths.iter().any(|&w| w != first) {
+            ctx.warnings.push(
+                "box-drawing lines have inconsistent widths — diagram may be misaligned".into(),
+            );
+        }
+    }
 }
 
 #[cfg(test)]

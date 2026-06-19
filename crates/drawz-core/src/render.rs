@@ -22,12 +22,10 @@ pub fn render(diagram: &Diagram, width: u16) -> RenderResult {
             | Diagram::Sequence(_) | Diagram::Dag(_)
     );
 
-    let inner_width = if framed {
-        (width as usize).saturating_sub(4)
-    } else {
-        width as usize
-    };
-
+    // Use requested width as inner_width for layout hints, but renderers
+    // that can render at natural size (horizontal flow, DAG) will overflow.
+    // The post-processing step trims and re-aligns all lines.
+    let inner_width = if framed { (width as usize).saturating_sub(4) } else { width as usize };
     let mut ctx = RenderContext {
         inner_width,
         total_width: width,
@@ -66,12 +64,44 @@ pub fn render(diagram: &Diagram, width: u16) -> RenderResult {
             warnings: ctx.warnings,
         },
         Ok(lines) => {
-            let output_lines = if framed {
-                frame::frame_box(&lines, title, width)
+            // Check if any line exceeds the requested inner width
+            let max_line_w = lines.iter()
+                .map(|l| crate::measure::display_width(l.trim_end()))
+                .max()
+                .unwrap_or(0);
+
+            let (output_lines, content_width) = if max_line_w > inner_width {
+                // Content overflows — render at natural size (no truncation)
+                let trimmed: Vec<String> = lines.iter()
+                    .map(|l| l.trim_end().to_string())
+                    .collect();
+                let natural_width = trimmed.iter()
+                    .map(|l| crate::measure::display_width(l))
+                    .max()
+                    .unwrap_or(0);
+                let title_width = title.map(|t| crate::measure::display_width(t) + 4).unwrap_or(0);
+                let final_width = natural_width.max(title_width);
+                let aligned: Vec<String> = trimmed.iter()
+                    .map(|l| crate::measure::pad_right(l, final_width))
+                    .collect();
+                if framed {
+                    let fw = (final_width + 4).min(65535) as u16;
+                    (frame::frame_box(&aligned, title, fw), final_width + 4)
+                } else {
+                    (aligned, final_width)
+                }
             } else {
-                lines
+                // Content fits — use requested width (original behavior)
+                if framed {
+                    (frame::frame_box(&lines, title, width), width as usize)
+                } else {
+                    (lines, inner_width)
+                }
             };
-            let fit = ctx.warnings.is_empty();
+
+            let fit = content_width <= width as usize
+                && ctx.warnings.iter().all(|w| w.starts_with("info:"));
+
             RenderResult {
                 output: Some(output_lines.join("\n")),
                 fit,

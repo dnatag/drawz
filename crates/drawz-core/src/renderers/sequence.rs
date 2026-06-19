@@ -50,8 +50,8 @@ pub(crate) fn render(diagram: &SequenceDiagram, ctx: &mut RenderContext) -> Resu
             continue;
         };
 
-        let msg_line = render_message(from, to, &msg.label, num_actors, col_width, ctx);
-        lines.push(msg_line);
+        let msg_lines = render_message(from, to, &msg.label, num_actors, col_width, ctx);
+        lines.extend(msg_lines);
         if from == to {
             let ret_line = render_self_return(from, num_actors, col_width, ctx);
             lines.push(ret_line);
@@ -63,11 +63,13 @@ pub(crate) fn render(diagram: &SequenceDiagram, ctx: &mut RenderContext) -> Resu
 }
 
 fn render_actor_row(actors: &[String], col_width: usize, ctx: &mut RenderContext) -> String {
+    let mut truncated = false;
     let row: String = actors
         .iter()
         .map(|a| {
             let max_w = col_width.saturating_sub(1);
             if display_width(a) > max_w {
+                truncated = true;
                 truncate(a, max_w)
             } else {
                 pad_right(a, max_w)
@@ -75,6 +77,9 @@ fn render_actor_row(actors: &[String], col_width: usize, ctx: &mut RenderContext
         })
         .collect::<Vec<_>>()
         .join(" ");
+    if truncated {
+        ctx.warnings.push("some actor names truncated — use fewer actors or wider width".into());
+    }
     pad_right(&row, ctx.inner_width)
 }
 
@@ -100,7 +105,7 @@ fn render_message(
     num_actors: usize,
     col_width: usize,
     ctx: &mut RenderContext,
-) -> String {
+) -> Vec<String> {
     let from_center = from * col_width + col_width / 2;
     let to_center = to * col_width + col_width / 2;
 
@@ -115,17 +120,11 @@ fn render_message(
     }
 
     if from == to {
-        // Self-message: first line is ├─┐ label
+        // Self-message: ├─┐ label
         let c = from_center;
-        if c < row.len() {
-            row[c] = '├';
-        }
-        if c + 1 < row.len() {
-            row[c + 1] = '─';
-        }
-        if c + 2 < row.len() {
-            row[c + 2] = '┐';
-        }
+        if c < row.len() { row[c] = '├'; }
+        if c + 1 < row.len() { row[c + 1] = '─'; }
+        if c + 2 < row.len() { row[c + 2] = '┐'; }
         let label_start = c + 4;
         let max_label = ctx.inner_width.saturating_sub(label_start);
         let fitted = if display_width(label) > max_label {
@@ -138,57 +137,78 @@ fn render_message(
                 row[label_start + j] = ch;
             }
         }
+        let s: String = row.into_iter().collect();
+        return vec![pad_right(s.trim_end(), ctx.inner_width)];
+    }
+
+    let (left, right) = if from < to {
+        (from_center, to_center)
     } else {
-        let (left, right) = if from < to {
-            (from_center, to_center)
-        } else {
-            (to_center, from_center)
-        };
-        let arrow_right = from < to;
+        (to_center, from_center)
+    };
+    let arrow_right = from < to;
+    let max_label = right.saturating_sub(left).saturating_sub(2);
+    let lw = display_width(label);
 
-        // Draw the arrow line
-        for c in left..=right {
-            if c < row.len() {
-                row[c] = '─';
-            }
-        }
-        // Arrow head
+    // If label fits inline, render on the arrow line
+    if lw <= max_label {
+        // Draw arrow
+        for c in left..=right { if c < row.len() { row[c] = '─'; } }
         if arrow_right {
-            if right < row.len() {
-                row[right] = '►';
-            }
-            if left < row.len() {
-                row[left] = '├';
-            }
+            if right < row.len() { row[right] = '►'; }
+            if left < row.len() { row[left] = '├'; }
         } else {
-            if left < row.len() {
-                row[left] = '◄';
-            }
-            if right < row.len() {
-                row[right] = '┤';
-            }
+            if left < row.len() { row[left] = '◄'; }
+            if right < row.len() { row[right] = '┤'; }
         }
-
-        // Place label in the middle
+        // Place label centered on arrow
         let mid = left + (right - left) / 2;
-        let lw = display_width(label);
         let label_start = mid.saturating_sub(lw / 2);
-        let max_label = right.saturating_sub(left).saturating_sub(2);
-        let fitted = if lw > max_label {
-            truncate(label, max_label)
-        } else {
-            label.to_string()
-        };
-        for (j, ch) in fitted.chars().enumerate() {
+        for (j, ch) in label.chars().enumerate() {
             let pos = label_start + j;
             if pos < row.len() && pos > left && pos < right {
                 row[pos] = ch;
             }
         }
+        let s: String = row.into_iter().collect();
+        return vec![pad_right(s.trim_end(), ctx.inner_width)];
     }
 
-    let s: String = row.into_iter().collect();
-    pad_right(s.trim_end(), ctx.inner_width)
+    // Label doesn't fit inline — put it on a separate line above the arrow
+    let mut label_row = vec![' '; ctx.inner_width];
+    // Place lifelines on label row too
+    for i in 0..num_actors {
+        let c = i * col_width + col_width / 2;
+        if c < label_row.len() {
+            label_row[c] = '│';
+        }
+    }
+    // Center label between the two actors
+    let mid = left + (right - left) / 2;
+    let label_start = mid.saturating_sub(lw / 2);
+    for (j, ch) in label.chars().enumerate() {
+        let pos = label_start + j;
+        if pos < label_row.len() {
+            label_row[pos] = ch;
+        }
+    }
+
+    // Draw the arrow line (no label on it)
+    for c in left..=right { if c < row.len() { row[c] = '─'; } }
+    if arrow_right {
+        if right < row.len() { row[right] = '►'; }
+        if left < row.len() { row[left] = '├'; }
+    } else {
+        if left < row.len() { row[left] = '◄'; }
+        if right < row.len() { row[right] = '┤'; }
+    }
+
+    let label_s: String = label_row.into_iter().collect();
+    let arrow_s: String = row.into_iter().collect();
+    vec![
+        pad_right(label_s.trim_end(), ctx.inner_width),
+        pad_right(arrow_s.trim_end(), ctx.inner_width),
+    ]
 }
 
 fn render_self_return(from: usize, num_actors: usize, col_width: usize, ctx: &mut RenderContext) -> String {

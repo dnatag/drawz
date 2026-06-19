@@ -1,9 +1,13 @@
-use crate::schema::{Diagram, Edge, FlowDiagram, Node};
+use crate::schema::{DagDiagram, Diagram, Edge, FlowDiagram, Node};
 
 use super::helpers::{skip_first_line, split_statements};
 
 /// Parse `graph LR; A-->B-->C` or multiline flowchart.
 pub(super) fn parse_flowchart(code: &str) -> Result<Diagram, String> {
+    // Extract direction from first line (e.g., "graph LR", "flowchart TD")
+    let first_part = code.split(['\n', ';']).next().unwrap_or("").trim();
+    let direction = first_part.split_whitespace().nth(1).map(String::from);
+
     let body = skip_first_line(code);
 
     let mut nodes: Vec<Node> = Vec::new();
@@ -32,12 +36,27 @@ pub(super) fn parse_flowchart(code: &str) -> Result<Diagram, String> {
         }
     }
 
-    Ok(Diagram::Flow(FlowDiagram {
-        title: None,
-        steps: None,
-        nodes: Some(nodes),
-        edges: Some(edges),
-    }))
+    // Detect branching/merging: if any node has multiple outgoing or incoming edges, use DAG
+    let has_branching = edges.iter().any(|e1| {
+        edges.iter().filter(|e2| e2.from == e1.from).count() > 1
+            || edges.iter().filter(|e2| e2.to == e1.to).count() > 1
+    });
+
+    if has_branching {
+        Ok(Diagram::Dag(DagDiagram {
+            title: None,
+            nodes: Some(nodes),
+            edges,
+        }))
+    } else {
+        Ok(Diagram::Flow(FlowDiagram {
+            title: None,
+            direction,
+            steps: None,
+            nodes: Some(nodes),
+            edges: Some(edges),
+        }))
+    }
 }
 
 fn parse_flow_statement(stmt: &str, nodes: &mut Vec<Node>, edges: &mut Vec<Edge>) {
@@ -230,12 +249,12 @@ mod tests {
     #[test]
     fn should_not_duplicate_nodes() {
         let d = parse_flowchart("graph LR\nA-->B\nA-->C").unwrap();
-        if let Diagram::Flow(f) = d {
-            let nodes = f.nodes.unwrap();
+        if let Diagram::Dag(dag) = d {
+            let nodes = dag.nodes.unwrap();
             let a_count = nodes.iter().filter(|n| n.id.as_deref() == Some("A")).count();
             assert_eq!(a_count, 1);
         } else {
-            panic!("expected Flow");
+            panic!("expected Dag for branching graph");
         }
     }
 }

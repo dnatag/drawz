@@ -13,14 +13,15 @@ pub(crate) fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<
     }
 
     let num_cols = diagram.headers.len();
-    let separator_width = if num_cols > 1 { (num_cols - 1) * 3 } else { 0 };
-    let available = ctx.inner_width.saturating_sub(separator_width);
+    // Grid: │ cell │ cell │  →  2 (outer borders) + num_cols*2 (padding) + (num_cols-1) (inner │)
+    let chrome_width = 2 + num_cols * 2 + num_cols.saturating_sub(1);
+    let available = ctx.inner_width.saturating_sub(chrome_width);
 
     if available < num_cols {
         return Err(format!(
             "cannot render {num_cols}-column table at width {} (minimum needed: {})",
             ctx.total_width,
-            separator_width + num_cols * 6
+            chrome_width + num_cols
         ));
     }
 
@@ -68,31 +69,65 @@ pub(crate) fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<
 
     let mut lines = Vec::new();
 
-    // Header line
-    let header: String = diagram.headers.iter().enumerate()
-        .map(|(i, h)| fit_cell(h, col_widths[i]))
-        .collect::<Vec<_>>()
-        .join(" │ ");
+    // Top border: ┌───┬───┐
+    let top: String = format!(
+        "┌{}┐",
+        col_widths.iter()
+            .map(|w| "─".repeat(*w + 2))
+            .collect::<Vec<_>>()
+            .join("┬")
+    );
+    lines.push(pad_right(&top, ctx.inner_width));
+
+    // Header row: │ H1 │ H2 │
+    let header: String = format!(
+        "│{}│",
+        diagram.headers.iter().enumerate()
+            .map(|(i, h)| format!(" {} ", fit_cell(h, col_widths[i])))
+            .collect::<Vec<_>>()
+            .join("│")
+    );
     lines.push(pad_right(&header, ctx.inner_width));
 
-    // Separator line
-    let sep: String = col_widths.iter()
-        .map(|w| "─".repeat(*w))
-        .collect::<Vec<_>>()
-        .join("─┼─");
-    lines.push(pad_right(&sep, ctx.inner_width));
-
-    // Data rows
-    for row in &diagram.rows {
-        let cells: String = (0..num_cols)
-            .map(|i| {
-                let cell = row.get(i).map_or("", String::as_str);
-                fit_cell(cell, col_widths[i])
-            })
+    // Header separator: ├───┼───┤
+    let header_sep: String = format!(
+        "├{}┤",
+        col_widths.iter()
+            .map(|w| "─".repeat(*w + 2))
             .collect::<Vec<_>>()
-            .join(" │ ");
+            .join("┼")
+    );
+    lines.push(pad_right(&header_sep, ctx.inner_width));
+
+    // Data rows with separators between them
+    for (row_idx, row) in diagram.rows.iter().enumerate() {
+        let cells: String = format!(
+            "│{}│",
+            (0..num_cols)
+                .map(|i| {
+                    let cell = row.get(i).map_or("", String::as_str);
+                    format!(" {} ", fit_cell(cell, col_widths[i]))
+                })
+                .collect::<Vec<_>>()
+                .join("│")
+        );
         lines.push(pad_right(&cells, ctx.inner_width));
+
+        // Row separator (not after the last row)
+        if row_idx < diagram.rows.len() - 1 {
+            lines.push(pad_right(&header_sep, ctx.inner_width));
+        }
     }
+
+    // Bottom border: └───┴───┘
+    let bottom: String = format!(
+        "└{}┘",
+        col_widths.iter()
+            .map(|w| "─".repeat(*w + 2))
+            .collect::<Vec<_>>()
+            .join("┴")
+    );
+    lines.push(pad_right(&bottom, ctx.inner_width));
 
     Ok(lines)
 }
@@ -130,9 +165,12 @@ mod tests {
             rows: vec![vec!["1".into(), "2".into()]],
         };
         let lines = render(&d, &mut ctx(20)).unwrap();
-        assert_eq!(lines.len(), 3); // header + separator + 1 row
+        // top + header + header_sep + 1 row + bottom = 5
+        assert_eq!(lines.len(), 5);
         for l in &lines { assert_eq!(display_width(l), 20); }
-        assert!(lines[1].contains('┼'));
+        assert!(lines[0].contains('┌'));
+        assert!(lines[2].contains('┼'));
+        assert!(lines[4].contains('┘'));
     }
 
     #[test]
@@ -162,7 +200,8 @@ mod tests {
             rows: vec![vec!["only one".into()]],
         };
         let lines = render(&d, &mut ctx(30)).unwrap();
-        assert_eq!(lines.len(), 3);
+        // top + header + header_sep + 1 row + bottom = 5
+        assert_eq!(lines.len(), 5);
         for l in &lines { assert_eq!(display_width(l), 30); }
     }
 
