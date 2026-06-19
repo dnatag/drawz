@@ -6,7 +6,7 @@ fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
     assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
     let output = result.output.as_ref().expect("expected output");
     for line in output.lines() {
-        let first_w = output.lines().next().map(|l| display_width(l)).unwrap_or(0); assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
+        let first_w = output.lines().next().map(display_width).unwrap_or(0); assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
     }
 }
 
@@ -38,7 +38,7 @@ fn flow_linear_steps_alignment() {
     assert!(result.errors.is_empty());
     let output = result.output.unwrap();
     for line in output.lines() {
-        let expected_w = output.lines().next().map(|l| display_width(l)).unwrap_or(0); assert_eq!(display_width(line), expected_w, "misaligned: {line:?}");
+        let expected_w = output.lines().next().map(display_width).unwrap_or(0); assert_eq!(display_width(line), expected_w, "misaligned: {line:?}");
     }
 }
 

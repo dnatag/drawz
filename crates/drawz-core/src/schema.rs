@@ -12,7 +12,7 @@ use serde::Deserialize;
 /// Top-level input wrapper. Extracts `width` before dispatching to diagram type.
 #[derive(Debug, Deserialize)]
 pub struct DiagramInput {
-    /// Maximum output width in characters. Default: 80.
+    /// Maximum output width in characters. Default: 120.
     #[serde(default = "default_width")]
     pub width: u16,
     #[serde(flatten)]

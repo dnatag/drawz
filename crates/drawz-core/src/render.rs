@@ -99,8 +99,7 @@ pub fn render(diagram: &Diagram, width: u16) -> RenderResult {
                 }
             };
 
-            let fit = content_width <= width as usize
-                && ctx.warnings.iter().all(|w| w.starts_with("info:"));
+            let fit = content_width <= width as usize && ctx.warnings.is_empty();
 
             RenderResult {
                 output: Some(output_lines.join("\n")),

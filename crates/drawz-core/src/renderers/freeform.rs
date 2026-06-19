@@ -35,6 +35,12 @@ pub(crate) fn render(diagram: &FreeformDiagram, ctx: &mut RenderContext) -> Resu
     // Validate box-drawing alignment
     validate_box_alignment(&raw_lines, ctx);
 
+    // Check for truncation and warn
+    let has_truncation = raw_lines.iter().any(|l| crate::measure::display_width(l) > ctx.inner_width);
+    if has_truncation {
+        ctx.warnings.push("some lines truncated to fit width".to_string());
+    }
+
     let out: Vec<String> = raw_lines
         .iter()
         .map(|line| pad_right(line, ctx.inner_width))

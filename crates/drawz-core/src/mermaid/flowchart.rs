@@ -18,6 +18,10 @@ pub(super) fn parse_flowchart(code: &str) -> Result<Diagram, String> {
         if segment.is_empty() {
             continue;
         }
+        // Skip subgraph/end directives (not renderable as nodes)
+        if segment.starts_with("subgraph") || segment == "end" {
+            continue;
+        }
         parse_flow_statement(segment, &mut nodes, &mut edges);
     }
 
@@ -100,6 +104,7 @@ fn parse_flow_statement(stmt: &str, nodes: &mut Vec<Node>, edges: &mut Vec<Edge>
 
 fn extract_immediate_node(s: &str) -> String {
     let s = s.trim();
+    let arrow_patterns = ["-->|", "==>|", "-.->", "-->", "---", "==>"];
     let bytes = s.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
@@ -110,7 +115,14 @@ fn extract_immediate_node(s: &str) -> String {
                 while i < bytes.len() && bytes[i] != close { i += 1; }
                 if i < bytes.len() { i += 1; }
             }
-            b'-' | b'=' | b'.' => return s[..i].to_string(),
+            b'-' | b'=' | b'.' => {
+                // Only split if this is the start of a full arrow pattern
+                let rest = &s[i..];
+                if arrow_patterns.iter().any(|p| rest.starts_with(p)) {
+                    return s[..i].to_string();
+                }
+                i += 1;
+            }
             _ => i += 1,
         }
     }

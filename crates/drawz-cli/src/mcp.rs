@@ -83,7 +83,23 @@ impl ServerHandler for DrawzHandler {
 fn call_render(args: Option<serde_json::Map<String, Value>>, session_width: &AtomicU16) -> CallToolResult {
     let args = Value::Object(args.unwrap_or_default());
 
-    let input: DiagramInput = match serde_json::from_value(args) {
+    // Guard against excessively large inputs (>1MB JSON)
+    let args_str = args.to_string();
+    if args_str.len() > 1_048_576 {
+        let resp = RenderResponse {
+            output: None,
+            fit: false,
+            rendered_width: 0,
+            errors: vec!["input too large (>1MB)".to_string()],
+            warnings: vec![],
+            layout_note: None,
+        };
+        let mut result = CallToolResult::text_content(vec![to_json(&resp).into()]);
+        result.is_error = Some(true);
+        return result;
+    }
+
+    let input: DiagramInput = match serde_json::from_value(args.clone()) {
         Ok(d) => d,
         Err(e) => {
             let resp = RenderResponse {
@@ -102,10 +118,13 @@ fn call_render(args: Option<serde_json::Map<String, Value>>, session_width: &Ato
         }
     };
 
-    let width = if input.width != 120 {
+    // Detect if agent explicitly passed a width field (vs relying on default)
+    let explicit_width = args.as_object().and_then(|m| m.get("width")).and_then(|v| v.as_u64()).map(|w| w as u16);
+
+    let width = if let Some(w) = explicit_width {
         // Agent passed explicit width — remember it for the session
-        session_width.store(input.width, Ordering::Relaxed);
-        input.width
+        session_width.store(w, Ordering::Relaxed);
+        w
     } else {
         // No explicit width — use session width if set, else default
         let sw = session_width.load(Ordering::Relaxed);
@@ -115,28 +134,16 @@ fn call_render(args: Option<serde_json::Map<String, Value>>, session_width: &Ato
     let result = drawz_core::render(&input.diagram, width);
     let has_errors = result.output.is_none() && !result.errors.is_empty();
 
-    // Extract "info:" prefixed messages as layout notes (not warnings that affect fit)
-    let layout_note: Option<String> = result.warnings.iter()
-        .find(|w| w.starts_with("info:"))
-        .map(|w| w.strip_prefix("info: ").unwrap_or(w).to_string());
-    let warnings: Vec<String> = result.warnings.into_iter()
-        .filter(|w| !w.starts_with("info:"))
-        .collect();
-    let fit = result.fit && warnings.is_empty();
-
-    // Compute actual rendered width from output
-    let rendered_width = result.output.as_ref()
-        .and_then(|o| o.lines().next())
-        .map(|l| drawz_core::measure::display_width(l))
-        .unwrap_or(0);
-
     let resp = RenderResponse {
-        output: result.output,
-        fit,
-        rendered_width,
+        output: result.output.clone(),
+        fit: result.fit,
+        rendered_width: result.output.as_ref()
+            .and_then(|o| o.lines().next())
+            .map(drawz_core::measure::display_width)
+            .unwrap_or(0),
         errors: result.errors,
-        warnings,
-        layout_note,
+        warnings: result.warnings,
+        layout_note: None,
     };
     let mut call_result = CallToolResult::text_content(vec![to_json(&resp).into()]);
     if has_errors {

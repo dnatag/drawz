@@ -135,7 +135,6 @@ fn get_label<'a>(id: &'a str, diagram: &'a DagDiagram) -> &'a str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::measure::display_width;
     use crate::result::RenderContext;
     use crate::schema::{DagDiagram, Edge, Node};
 

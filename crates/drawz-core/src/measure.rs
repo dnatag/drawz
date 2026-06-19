@@ -285,4 +285,29 @@ mod tests {
         // ❤️ with VS16 — base ❤ is width 1
         assert_eq!(display_width("\u{2764}\u{FE0F}"), 1);
     }
+
+    #[test]
+    fn truncate_zwj_family() {
+        let zwj = "👨\u{200D}👩\u{200D}👧\u{200D}👦";
+        assert_eq!(display_width(zwj), 2); // whole ZWJ family = 2 cols
+        let t = truncate(zwj, 5);
+        assert!(display_width(&t) <= 5, "truncate result width {} > 5", display_width(&t));
+    }
+
+    #[test]
+    fn truncate_zwj_then_text() {
+        // ZWJ family (width 2) + "hello" (width 5) = 7 total
+        let s = "👨\u{200D}👩\u{200D}👧\u{200D}👦hello";
+        assert_eq!(display_width(s), 7);
+        let t = truncate(s, 4);
+        assert!(display_width(&t) <= 4, "truncate width {} > 4, got '{}'", display_width(&t), t);
+    }
+
+    #[test]
+    fn truncate_flag() {
+        let flag = "\u{1F1FA}\u{1F1F8}"; // US flag
+        assert_eq!(display_width(flag), 2);
+        let t = truncate(flag, 3);
+        assert!(display_width(&t) <= 3, "truncate result width {} > 3", display_width(&t));
+    }
 }

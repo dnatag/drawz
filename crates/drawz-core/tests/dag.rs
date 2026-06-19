@@ -5,7 +5,7 @@ use drawz_core::schema::*;
 fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
     assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
     let output = result.output.as_ref().expect("expected output");
-    let widths: Vec<usize> = output.lines().map(|l| display_width(l)).collect();
+    let widths: Vec<usize> = output.lines().map(display_width).collect();
     let first = widths[0];
     for (i, &w) in widths.iter().enumerate() {
         assert_eq!(w, first, "line {i} has width {w}, expected {first}");
