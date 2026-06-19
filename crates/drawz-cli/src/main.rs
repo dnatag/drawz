@@ -50,7 +50,16 @@ async fn main() {
         }
     };
 
-    let width = cli.width.unwrap_or(diagram_input.width);
+    let width = cli.width.unwrap_or_else(|| {
+        if diagram_input.width != 120 {
+            // User explicitly set width in JSON
+            return diagram_input.width;
+        }
+        // Detect terminal width, fall back to 120
+        terminal_size::terminal_size()
+            .map(|(w, _)| w.0)
+            .unwrap_or(120)
+    });
     let result = drawz_core::render(&diagram_input.diagram, width);
 
     if let Some(output) = &result.output {

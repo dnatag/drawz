@@ -163,7 +163,7 @@ fn render_diagram_bad_json_returns_error() {
     // rmcp may return a protocol error or our handler returns errors in content
     let is_error = r["error"].is_object()
         || r["result"]["isError"] == true
-        || r["result"]["content"][0]["text"].as_str().map_or(false, |t| t.contains("error"));
+        || r["result"]["content"][0]["text"].as_str().is_some_and(|t| t.contains("error"));
     assert!(is_error, "expected error, got: {r}");
 }
 
@@ -194,7 +194,7 @@ fn unknown_tool_returns_error() {
     // rmcp returns an error for unknown tools
     let has_error = r["error"].is_object()
         || r["result"]["isError"] == true
-        || r["result"]["content"][0]["text"].as_str().map_or(false, |t| t.contains("error") || t.contains("not found"));
+        || r["result"]["content"][0]["text"].as_str().is_some_and(|t| t.contains("error") || t.contains("not found"));
     assert!(has_error, "expected error response, got: {r}");
 }
 
