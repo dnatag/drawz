@@ -77,12 +77,12 @@ To make agents **prefer diagrams over prose**, add these lines to your `AGENTS.m
 - **Unit tests:** inline `#[cfg(test)] mod tests` in source files
 - **Integration tests:** `tests/` directory, one file per diagram type
 - **Test names:** `should_<behavior>_when_<condition>`
-- **196 tests total**, clippy clean with `-D warnings -W clippy::perf`
+- **248 tests total**, clippy clean with `-D warnings`
 
 ## Useful Commands
 
 ```sh
-cargo test                # all 196 tests
+cargo test                # all 248 tests
 cargo test --test mermaid # single test file
 cargo clippy --all-targets -- -D warnings
 cargo build --release
