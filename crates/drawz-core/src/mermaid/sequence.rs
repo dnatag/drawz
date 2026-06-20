@@ -14,7 +14,10 @@ pub(super) fn parse_sequence(code: &str) -> Result<Diagram, String> {
             continue;
         }
 
-        if let Some(rest) = line.strip_prefix("participant ").or_else(|| line.strip_prefix("actor ")) {
+        if let Some(rest) = line
+            .strip_prefix("participant ")
+            .or_else(|| line.strip_prefix("actor "))
+        {
             let name = rest.trim().to_string();
             if !actors.contains(&name) {
                 actors.push(name);
@@ -74,7 +77,8 @@ mod tests {
 
     #[test]
     fn should_parse_participant_declarations() {
-        let d = parse_sequence("sequenceDiagram\nparticipant A\nparticipant B\nA->>B: msg").unwrap();
+        let d =
+            parse_sequence("sequenceDiagram\nparticipant A\nparticipant B\nA->>B: msg").unwrap();
         if let Diagram::Sequence(s) = d {
             assert_eq!(s.actors[0], "A");
             assert_eq!(s.actors[1], "B");

@@ -31,7 +31,13 @@ fn send_requests(requests: &[Value]) -> Vec<Value> {
     reader.read_line(&mut line).unwrap();
 
     // Send initialized notification
-    writeln!(stdin, "{}", serde_json::to_string(&json!({"jsonrpc": "2.0", "method": "notifications/initialized"})).unwrap()).unwrap();
+    writeln!(
+        stdin,
+        "{}",
+        serde_json::to_string(&json!({"jsonrpc": "2.0", "method": "notifications/initialized"}))
+            .unwrap()
+    )
+    .unwrap();
     stdin.flush().unwrap();
 
     // Small delay to let server process the notification
@@ -124,7 +130,9 @@ fn render_diagram_flow_returns_output() {
     })]);
 
     assert_eq!(responses.len(), 1);
-    let content = responses[0]["result"]["content"][0]["text"].as_str().unwrap();
+    let content = responses[0]["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap();
     let inner: Value = serde_json::from_str(content).unwrap();
     assert!(inner["output"].is_string());
     assert_eq!(inner["fit"], true);
@@ -142,7 +150,9 @@ fn render_diagram_invalid_input_returns_errors() {
     })]);
 
     assert_eq!(responses.len(), 1);
-    let content = responses[0]["result"]["content"][0]["text"].as_str().unwrap();
+    let content = responses[0]["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap();
     let inner: Value = serde_json::from_str(content).unwrap();
     assert!(inner["output"].is_null());
     assert!(!inner["errors"].as_array().unwrap().is_empty());
@@ -163,7 +173,9 @@ fn render_diagram_bad_json_returns_error() {
     // rmcp may return a protocol error or our handler returns errors in content
     let is_error = r["error"].is_object()
         || r["result"]["isError"] == true
-        || r["result"]["content"][0]["text"].as_str().is_some_and(|t| t.contains("error"));
+        || r["result"]["content"][0]["text"]
+            .as_str()
+            .is_some_and(|t| t.contains("error"));
     assert!(is_error, "expected error, got: {r}");
 }
 
@@ -175,11 +187,13 @@ fn introspect_returns_all_types() {
     })]);
 
     assert_eq!(responses.len(), 1);
-    let content = responses[0]["result"]["content"][0]["text"].as_str().unwrap();
+    let content = responses[0]["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap();
     let inner: Value = serde_json::from_str(content).unwrap();
     let types = inner["types"].as_array().unwrap();
     assert_eq!(types.len(), 8);
-    assert_eq!(inner["version"], "0.1.0");
+    assert_eq!(inner["version"], "1.0.0");
 }
 
 #[test]
@@ -194,7 +208,9 @@ fn unknown_tool_returns_error() {
     // rmcp returns an error for unknown tools
     let has_error = r["error"].is_object()
         || r["result"]["isError"] == true
-        || r["result"]["content"][0]["text"].as_str().is_some_and(|t| t.contains("error") || t.contains("not found"));
+        || r["result"]["content"][0]["text"]
+            .as_str()
+            .is_some_and(|t| t.contains("error") || t.contains("not found"));
     assert!(has_error, "expected error response, got: {r}");
 }
 

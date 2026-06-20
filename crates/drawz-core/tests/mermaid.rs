@@ -3,10 +3,15 @@ use drawz_core::render;
 use drawz_core::schema::*;
 
 fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
-    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected errors: {:?}",
+        result.errors
+    );
     let output = result.output.as_ref().expect("expected output");
     for line in output.lines() {
-        let first_w = output.lines().next().map(display_width).unwrap_or(0); assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
+        let first_w = output.lines().next().map(display_width).unwrap_or(0);
+        assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
     }
 }
 
@@ -23,7 +28,10 @@ fn assert_and_print(label: &str, result: &drawz_core::RenderResult, width: u16) 
 
 #[test]
 fn mermaid_unsupported_type_returns_error() {
-    let d = Diagram::Mermaid(MermaidDiagram { title: None, code: "pie\n  \"A\": 50\n  \"B\": 50".into() });
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "pie\n  \"A\": 50\n  \"B\": 50".into(),
+    });
     let result = render(&d, 80);
     assert!(!result.errors.is_empty());
     assert!(result.output.is_none());
@@ -71,7 +79,10 @@ fn mermaid_state_renders_as_state() {
 
 #[test]
 fn mermaid_empty_flowchart_body_error() {
-    let d = Diagram::Mermaid(MermaidDiagram { title: None, code: "graph LR\n".into() });
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "graph LR\n".into(),
+    });
     let result = render(&d, 40);
     assert!(!result.errors.is_empty());
 }
@@ -171,7 +182,10 @@ fn mermaid_state_no_transitions_error() {
 
 #[test]
 fn mermaid_unsupported_diagram_type() {
-    let d = Diagram::Mermaid(MermaidDiagram { title: None, code: "erDiagram\nFoo ||--o{ Bar : has".into() });
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "erDiagram\nFoo ||--o{ Bar : has".into(),
+    });
     let result = render(&d, 40);
     assert!(!result.errors.is_empty());
 }

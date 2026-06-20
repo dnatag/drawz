@@ -6,20 +6,20 @@
 #![deny(missing_docs)]
 #![allow(clippy::module_name_repetitions)]
 
-/// Diagram input schema types.
-pub mod schema;
-/// Render result and context types.
-pub mod result;
-/// Unicode-aware measurement utilities.
-pub mod measure;
 /// Box-drawing frame wrapper.
 pub mod frame;
+/// Unicode-aware measurement utilities.
+pub mod measure;
+/// Mermaid subset parser.
+pub mod mermaid;
 /// Top-level render dispatch.
 pub mod render;
 /// Per-type diagram renderers.
 pub mod renderers;
-/// Mermaid subset parser.
-pub mod mermaid;
+/// Render result and context types.
+pub mod result;
+/// Diagram input schema types.
+pub mod schema;
 
 pub use render::render;
 pub use result::RenderResult;

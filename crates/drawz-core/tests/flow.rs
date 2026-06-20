@@ -3,10 +3,15 @@ use drawz_core::render;
 use drawz_core::schema::*;
 
 fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
-    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected errors: {:?}",
+        result.errors
+    );
     let output = result.output.as_ref().expect("expected output");
     for line in output.lines() {
-        let first_w = output.lines().next().map(display_width).unwrap_or(0); assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
+        let first_w = output.lines().next().map(display_width).unwrap_or(0);
+        assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
     }
 }
 
@@ -38,7 +43,8 @@ fn flow_linear_steps_alignment() {
     assert!(result.errors.is_empty());
     let output = result.output.unwrap();
     for line in output.lines() {
-        let expected_w = output.lines().next().map(display_width).unwrap_or(0); assert_eq!(display_width(line), expected_w, "misaligned: {line:?}");
+        let expected_w = output.lines().next().map(display_width).unwrap_or(0);
+        assert_eq!(display_width(line), expected_w, "misaligned: {line:?}");
     }
 }
 
@@ -51,7 +57,10 @@ fn flow_nested_subflow_alignment() {
             FlowStep::Label("Start".into()),
             FlowStep::Sub(SubFlow {
                 label: "Processing".into(),
-                steps: vec![FlowStep::Label("Step A".into()), FlowStep::Label("Step B".into())],
+                steps: vec![
+                    FlowStep::Label("Step A".into()),
+                    FlowStep::Label("Step B".into()),
+                ],
             }),
             FlowStep::Label("End".into()),
         ]),
@@ -172,15 +181,39 @@ fn flow_graph_mode_with_edges() {
         direction: None,
         steps: None,
         nodes: Some(vec![
-            Node { id: Some("req".into()), label: "Request".into() },
-            Node { id: Some("auth".into()), label: "Auth Check".into() },
-            Node { id: Some("handler".into()), label: "Handler".into() },
-            Node { id: Some("resp".into()), label: "Response".into() },
+            Node {
+                id: Some("req".into()),
+                label: "Request".into(),
+            },
+            Node {
+                id: Some("auth".into()),
+                label: "Auth Check".into(),
+            },
+            Node {
+                id: Some("handler".into()),
+                label: "Handler".into(),
+            },
+            Node {
+                id: Some("resp".into()),
+                label: "Response".into(),
+            },
         ]),
         edges: Some(vec![
-            Edge { from: "req".into(), to: "auth".into(), label: Some("validate".into()) },
-            Edge { from: "auth".into(), to: "handler".into(), label: Some("authorized".into()) },
-            Edge { from: "handler".into(), to: "resp".into(), label: None },
+            Edge {
+                from: "req".into(),
+                to: "auth".into(),
+                label: Some("validate".into()),
+            },
+            Edge {
+                from: "auth".into(),
+                to: "handler".into(),
+                label: Some("authorized".into()),
+            },
+            Edge {
+                from: "handler".into(),
+                to: "resp".into(),
+                label: None,
+            },
         ]),
     });
     let result = render(&d, 40);
@@ -197,33 +230,55 @@ fn narrow_width_all_types_still_align() {
     let width: u16 = 20;
 
     let cases: Vec<(&str, Diagram)> = vec![
-        ("Freeform@20", Diagram::Freeform(FreeformDiagram {
-            title: None,
-            content: Some("short\nlines".into()),
-            lines: None,
-        })),
-        ("Flow@20", Diagram::Flow(FlowDiagram {
-            title: None,
-        direction: None,
-            steps: Some(vec![FlowStep::Label("A".into()), FlowStep::Label("B".into())]),
-            nodes: None,
-            edges: None,
-        })),
-        ("State@20", Diagram::State(StateDiagram {
-            title: None,
-            states: None,
-            transitions: vec![Edge { from: "X".into(), to: "Y".into(), label: None }],
-        })),
-        ("Tree@20", Diagram::Tree(TreeDiagram {
-            title: None,
-            root: None,
-            indent: Some("r\n  a\n  b".into()),
-        })),
-        ("Table@20", Diagram::Table(TableDiagram {
-            title: None,
-            headers: vec!["H".into()],
-            rows: vec![vec!["v".into()]],
-        })),
+        (
+            "Freeform@20",
+            Diagram::Freeform(FreeformDiagram {
+                title: None,
+                content: Some("short\nlines".into()),
+                lines: None,
+            }),
+        ),
+        (
+            "Flow@20",
+            Diagram::Flow(FlowDiagram {
+                title: None,
+                direction: None,
+                steps: Some(vec![
+                    FlowStep::Label("A".into()),
+                    FlowStep::Label("B".into()),
+                ]),
+                nodes: None,
+                edges: None,
+            }),
+        ),
+        (
+            "State@20",
+            Diagram::State(StateDiagram {
+                title: None,
+                states: None,
+                transitions: vec![Edge {
+                    from: "X".into(),
+                    to: "Y".into(),
+                    label: None,
+                }],
+            }),
+        ),
+        (
+            "Tree@20",
+            Diagram::Tree(TreeDiagram {
+                title: None,
+                root: None,
+                indent: Some("r\n  a\n  b".into()),
+            }),
+        ),
+        (
+            "Table@20",
+            Diagram::Table(TableDiagram {
+                title: None,
+                headers: vec!["H".into()],
+                rows: vec![vec!["v".into()]],
+            }),
+        ),
     ];
 
     for (label, d) in &cases {
@@ -237,7 +292,10 @@ fn flow_empty_label_does_not_panic() {
     let d = Diagram::Flow(FlowDiagram {
         title: None,
         direction: None,
-        steps: Some(vec![FlowStep::Label("".into()), FlowStep::Label("B".into())]),
+        steps: Some(vec![
+            FlowStep::Label("".into()),
+            FlowStep::Label("B".into()),
+        ]),
         nodes: None,
         edges: None,
     });

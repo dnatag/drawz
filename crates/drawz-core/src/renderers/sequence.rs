@@ -9,7 +9,10 @@ use crate::schema::SequenceDiagram;
 /// # Errors
 ///
 /// Returns an error if actors list is empty.
-pub(crate) fn render(diagram: &SequenceDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(
+    diagram: &SequenceDiagram,
+    ctx: &mut RenderContext,
+) -> Result<Vec<String>, String> {
     if diagram.actors.is_empty() {
         return Err("sequence diagram requires at least one actor".to_string());
     }
@@ -78,7 +81,8 @@ fn render_actor_row(actors: &[String], col_width: usize, ctx: &mut RenderContext
         .collect::<Vec<_>>()
         .join(" ");
     if truncated {
-        ctx.warnings.push("some actor names truncated — use fewer actors or wider width".into());
+        ctx.warnings
+            .push("some actor names truncated — use fewer actors or wider width".into());
     }
     pad_right(&row, ctx.inner_width)
 }
@@ -122,9 +126,15 @@ fn render_message(
     if from == to {
         // Self-message: ├─┐ label
         let c = from_center;
-        if c < row.len() { row[c] = '├'; }
-        if c + 1 < row.len() { row[c + 1] = '─'; }
-        if c + 2 < row.len() { row[c + 2] = '┐'; }
+        if c < row.len() {
+            row[c] = '├';
+        }
+        if c + 1 < row.len() {
+            row[c + 1] = '─';
+        }
+        if c + 2 < row.len() {
+            row[c + 2] = '┐';
+        }
         let label_start = c + 4;
         let max_label = ctx.inner_width.saturating_sub(label_start);
         let fitted = if display_width(label) > max_label {
@@ -153,13 +163,25 @@ fn render_message(
     // If label fits inline, render on the arrow line
     if lw <= max_label {
         // Draw arrow
-        for c in left..=right { if c < row.len() { row[c] = '─'; } }
+        for c in left..=right {
+            if c < row.len() {
+                row[c] = '─';
+            }
+        }
         if arrow_right {
-            if right < row.len() { row[right] = '►'; }
-            if left < row.len() { row[left] = '├'; }
+            if right < row.len() {
+                row[right] = '►';
+            }
+            if left < row.len() {
+                row[left] = '├';
+            }
         } else {
-            if left < row.len() { row[left] = '◄'; }
-            if right < row.len() { row[right] = '┤'; }
+            if left < row.len() {
+                row[left] = '◄';
+            }
+            if right < row.len() {
+                row[right] = '┤';
+            }
         }
         // Place label centered on arrow
         let mid = left + (right - left) / 2;
@@ -194,13 +216,25 @@ fn render_message(
     }
 
     // Draw the arrow line (no label on it)
-    for c in left..=right { if c < row.len() { row[c] = '─'; } }
+    for c in left..=right {
+        if c < row.len() {
+            row[c] = '─';
+        }
+    }
     if arrow_right {
-        if right < row.len() { row[right] = '►'; }
-        if left < row.len() { row[left] = '├'; }
+        if right < row.len() {
+            row[right] = '►';
+        }
+        if left < row.len() {
+            row[left] = '├';
+        }
     } else {
-        if left < row.len() { row[left] = '◄'; }
-        if right < row.len() { row[right] = '┤'; }
+        if left < row.len() {
+            row[left] = '◄';
+        }
+        if right < row.len() {
+            row[right] = '┤';
+        }
     }
 
     let label_s: String = label_row.into_iter().collect();
@@ -211,7 +245,12 @@ fn render_message(
     ]
 }
 
-fn render_self_return(from: usize, num_actors: usize, col_width: usize, ctx: &mut RenderContext) -> String {
+fn render_self_return(
+    from: usize,
+    num_actors: usize,
+    col_width: usize,
+    ctx: &mut RenderContext,
+) -> String {
     let from_center = from * col_width + col_width / 2;
     let mut row = vec![' '; ctx.inner_width];
     for i in 0..num_actors {
@@ -242,7 +281,11 @@ mod tests {
     use crate::schema::{Message, SequenceDiagram};
 
     fn ctx(width: usize) -> RenderContext {
-        RenderContext { inner_width: width, total_width: u16::try_from(width).unwrap(), warnings: Vec::new() }
+        RenderContext {
+            inner_width: width,
+            total_width: u16::try_from(width).unwrap(),
+            warnings: Vec::new(),
+        }
     }
 
     #[test]
@@ -250,17 +293,27 @@ mod tests {
         let d = SequenceDiagram {
             title: None,
             actors: vec!["Client".into(), "Server".into()],
-            messages: vec![Message { from: "Client".into(), to: "Server".into(), label: "GET".into() }],
+            messages: vec![Message {
+                from: "Client".into(),
+                to: "Server".into(),
+                label: "GET".into(),
+            }],
         };
         let lines = render(&d, &mut ctx(40)).unwrap();
         assert!(lines.iter().any(|l| l.contains("Client")));
         assert!(lines.iter().any(|l| l.contains("Server")));
-        for l in &lines { assert_eq!(display_width(l), 40); }
+        for l in &lines {
+            assert_eq!(display_width(l), 40);
+        }
     }
 
     #[test]
     fn should_return_error_when_actors_empty() {
-        let d = SequenceDiagram { title: None, actors: vec![], messages: vec![] };
+        let d = SequenceDiagram {
+            title: None,
+            actors: vec![],
+            messages: vec![],
+        };
         assert!(render(&d, &mut ctx(40)).is_err());
     }
 
@@ -269,7 +322,11 @@ mod tests {
         let d = SequenceDiagram {
             title: None,
             actors: vec!["A".into()],
-            messages: vec![Message { from: "A".into(), to: "Unknown".into(), label: "x".into() }],
+            messages: vec![Message {
+                from: "A".into(),
+                to: "Unknown".into(),
+                label: "x".into(),
+            }],
         };
         let mut c = ctx(40);
         let _ = render(&d, &mut c);
@@ -278,10 +335,16 @@ mod tests {
 
     #[test]
     fn should_render_single_actor_when_no_messages() {
-        let d = SequenceDiagram { title: None, actors: vec!["Solo".into()], messages: vec![] };
+        let d = SequenceDiagram {
+            title: None,
+            actors: vec!["Solo".into()],
+            messages: vec![],
+        };
         let lines = render(&d, &mut ctx(20)).unwrap();
         assert!(lines.iter().any(|l| l.contains("Solo")));
-        for l in &lines { assert_eq!(display_width(l), 20); }
+        for l in &lines {
+            assert_eq!(display_width(l), 20);
+        }
     }
 
     #[test]
@@ -289,13 +352,25 @@ mod tests {
         let d = SequenceDiagram {
             title: None,
             actors: vec!["A".into(), "B".into()],
-            messages: vec![Message { from: "A".into(), to: "A".into(), label: "tick".into() }],
+            messages: vec![Message {
+                from: "A".into(),
+                to: "A".into(),
+                label: "tick".into(),
+            }],
         };
         let mut c = ctx(40);
         let lines = render(&d, &mut c).unwrap();
-        assert!(lines.iter().any(|l| l.contains("├─┐")), "missing loopback top");
-        assert!(lines.iter().any(|l| l.contains("◄─┘")), "missing loopback bottom");
+        assert!(
+            lines.iter().any(|l| l.contains("├─┐")),
+            "missing loopback top"
+        );
+        assert!(
+            lines.iter().any(|l| l.contains("◄─┘")),
+            "missing loopback bottom"
+        );
         assert!(lines.iter().any(|l| l.contains("tick")), "missing label");
-        for l in &lines { assert_eq!(display_width(l), 40); }
+        for l in &lines {
+            assert_eq!(display_width(l), 40);
+        }
     }
 }

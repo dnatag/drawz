@@ -7,7 +7,10 @@ use crate::schema::{TreeDiagram, TreeNode};
 /// # Errors
 ///
 /// Returns an error if neither `indent` nor `root` is provided.
-pub(crate) fn render(diagram: &TreeDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(
+    diagram: &TreeDiagram,
+    ctx: &mut RenderContext,
+) -> Result<Vec<String>, String> {
     let lines = if let Some(indent) = &diagram.indent {
         render_indent(indent, ctx)
     } else if let Some(root) = &diagram.root {
@@ -33,7 +36,8 @@ fn render_indent(text: &str, ctx: &mut RenderContext) -> Vec<String> {
 
     let entries: Vec<(usize, &str)> = {
         // Auto-detect indent unit from first indented line
-        let indent_unit = raw.iter()
+        let indent_unit = raw
+            .iter()
             .map(|line| line.len() - line.trim_start().len())
             .find(|&s| s > 0)
             .unwrap_or(2);
@@ -114,7 +118,12 @@ fn render_node(root: &TreeNode, ctx: &mut RenderContext) -> Vec<String> {
     lines
 }
 
-fn render_children(children: &[TreeNode], prefix: &str, ctx: &mut RenderContext, out: &mut Vec<String>) {
+fn render_children(
+    children: &[TreeNode],
+    prefix: &str,
+    ctx: &mut RenderContext,
+    out: &mut Vec<String>,
+) {
     for (i, child) in children.iter().enumerate() {
         let is_last = i == children.len() - 1;
         let connector = if is_last { "└── " } else { "├── " };
@@ -131,7 +140,8 @@ fn render_children(children: &[TreeNode], prefix: &str, ctx: &mut RenderContext,
 fn fit_line(line: &str, ctx: &mut RenderContext) -> String {
     let w = display_width(line);
     if w > ctx.inner_width {
-        ctx.warnings.push("suggestion: some labels truncated to fit width".to_string());
+        ctx.warnings
+            .push("suggestion: some labels truncated to fit width".to_string());
         pad_right(&truncate(line, ctx.inner_width), ctx.inner_width)
     } else {
         pad_right(line, ctx.inner_width)
@@ -146,16 +156,26 @@ mod tests {
     use crate::schema::{TreeDiagram, TreeNode};
 
     fn ctx(width: usize) -> RenderContext {
-        RenderContext { inner_width: width, total_width: u16::try_from(width).unwrap(), warnings: Vec::new() }
+        RenderContext {
+            inner_width: width,
+            total_width: u16::try_from(width).unwrap(),
+            warnings: Vec::new(),
+        }
     }
 
     #[test]
     fn should_render_connectors_when_indent_provided() {
-        let d = TreeDiagram { title: None, root: None, indent: Some("root\n  a\n  b".into()) };
+        let d = TreeDiagram {
+            title: None,
+            root: None,
+            indent: Some("root\n  a\n  b".into()),
+        };
         let lines = render(&d, &mut ctx(40)).unwrap();
         assert!(lines.iter().any(|l| l.contains("├──")));
         assert!(lines.iter().any(|l| l.contains("└──")));
-        for l in &lines { assert_eq!(display_width(l), 40); }
+        for l in &lines {
+            assert_eq!(display_width(l), 40);
+        }
     }
 
     #[test]
@@ -166,31 +186,50 @@ mod tests {
             root: Some(TreeNode {
                 label: "r".into(),
                 children: vec![
-                    TreeNode { label: "a".into(), children: vec![] },
-                    TreeNode { label: "b".into(), children: vec![
-                        TreeNode { label: "c".into(), children: vec![] },
-                    ] },
+                    TreeNode {
+                        label: "a".into(),
+                        children: vec![],
+                    },
+                    TreeNode {
+                        label: "b".into(),
+                        children: vec![TreeNode {
+                            label: "c".into(),
+                            children: vec![],
+                        }],
+                    },
                 ],
             }),
         };
         let lines = render(&d, &mut ctx(30)).unwrap();
         assert_eq!(lines[0].trim_end(), "r");
         assert!(lines.iter().any(|l| l.contains("└── c")));
-        for l in &lines { assert_eq!(display_width(l), 30); }
+        for l in &lines {
+            assert_eq!(display_width(l), 30);
+        }
     }
 
     #[test]
     fn should_return_error_when_no_indent_or_root() {
-        let d = TreeDiagram { title: None, root: None, indent: None };
+        let d = TreeDiagram {
+            title: None,
+            root: None,
+            indent: None,
+        };
         assert!(render(&d, &mut ctx(40)).is_err());
     }
 
     #[test]
     fn should_truncate_and_warn_when_labels_exceed_width() {
-        let d = TreeDiagram { title: None, root: None, indent: Some("root\n  a_very_long_label_that_exceeds_width".into()) };
+        let d = TreeDiagram {
+            title: None,
+            root: None,
+            indent: Some("root\n  a_very_long_label_that_exceeds_width".into()),
+        };
         let mut c = ctx(15);
         let lines = render(&d, &mut c).unwrap();
-        for l in &lines { assert_eq!(display_width(l), 15); }
+        for l in &lines {
+            assert_eq!(display_width(l), 15);
+        }
         assert!(!c.warnings.is_empty());
     }
 }

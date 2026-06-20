@@ -3,10 +3,15 @@ use drawz_core::render;
 use drawz_core::schema::*;
 
 fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
-    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected errors: {:?}",
+        result.errors
+    );
     let output = result.output.as_ref().expect("expected output");
     for line in output.lines() {
-        let first_w = output.lines().next().map(display_width).unwrap_or(0); assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
+        let first_w = output.lines().next().map(display_width).unwrap_or(0);
+        assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
     }
 }
 
@@ -108,7 +113,10 @@ fn freeform_lines_field() {
 fn freeform_preserves_content_structure() {
     let d = Diagram::Freeform(FreeformDiagram {
         title: Some("Architecture".into()),
-        content: Some("┌─────────┐    ┌─────────┐\n│  Client │───►│  Server │\n└─────────┘    └─────────┘".into()),
+        content: Some(
+            "┌─────────┐    ┌─────────┐\n│  Client │───►│  Server │\n└─────────┘    └─────────┘"
+                .into(),
+        ),
         lines: None,
     });
     let result = render(&d, 50);
@@ -121,7 +129,11 @@ fn freeform_preserves_content_structure() {
 
 #[test]
 fn freeform_width_below_minimum_rejected() {
-    let d = Diagram::Freeform(FreeformDiagram { title: None, content: Some("x".into()), lines: None });
+    let d = Diagram::Freeform(FreeformDiagram {
+        title: None,
+        content: Some("x".into()),
+        lines: None,
+    });
     for w in [0, 1, 2, 3] {
         let result = render(&d, w);
         assert!(!result.errors.is_empty(), "width {w} should be rejected");
@@ -131,7 +143,11 @@ fn freeform_width_below_minimum_rejected() {
 
 #[test]
 fn freeform_minimum_width() {
-    let d = Diagram::Freeform(FreeformDiagram { title: None, content: Some("hi".into()), lines: None });
+    let d = Diagram::Freeform(FreeformDiagram {
+        title: None,
+        content: Some("hi".into()),
+        lines: None,
+    });
     let result = render(&d, 4);
     assert!(result.output.is_some() || !result.errors.is_empty());
 }

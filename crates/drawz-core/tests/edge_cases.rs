@@ -5,10 +5,15 @@ use drawz_core::render;
 use drawz_core::schema::*;
 
 fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
-    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected errors: {:?}",
+        result.errors
+    );
     let output = result.output.as_ref().expect("expected output");
     for line in output.lines() {
-        let first_w = output.lines().next().map(display_width).unwrap_or(0); assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
+        let first_w = output.lines().next().map(display_width).unwrap_or(0);
+        assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
     }
 }
 
@@ -31,7 +36,9 @@ fn flow_lr_with_short_labels() {
     assert_aligned(&result, 50);
     let output = result.output.unwrap();
     // All on same line (horizontal)
-    assert!(output.lines().any(|l| l.contains('A') && l.contains('B') && l.contains('C')));
+    assert!(output
+        .lines()
+        .any(|l| l.contains('A') && l.contains('B') && l.contains('C')));
 }
 
 #[test]
@@ -51,13 +58,17 @@ fn flow_lr_renders_horizontally_even_with_long_labels() {
     let result = render(&d, 120);
     assert!(result.output.is_some());
     let output = result.output.unwrap();
-    assert!(output.lines().any(|l| l.contains("First") && l.contains("Second") && l.contains("Third")));
+    assert!(output
+        .lines()
+        .any(|l| l.contains("First") && l.contains("Second") && l.contains("Third")));
 
     // At narrow width: falls back to vertical
     let result2 = render(&d, 60);
     assert!(result2.output.is_some());
     let output2 = result2.output.unwrap();
-    assert!(!output2.lines().any(|l| l.contains("First") && l.contains("Second")));
+    assert!(!output2
+        .lines()
+        .any(|l| l.contains("First") && l.contains("Second")));
 }
 
 #[test]
@@ -81,10 +92,20 @@ fn dag_nodes_as_strings() {
     let d = Diagram::Dag(DagDiagram {
         title: None,
         nodes: Some(vec![
-            Node { id: None, label: "Alpha".into() },
-            Node { id: None, label: "Beta".into() },
+            Node {
+                id: None,
+                label: "Alpha".into(),
+            },
+            Node {
+                id: None,
+                label: "Beta".into(),
+            },
         ]),
-        edges: vec![Edge { from: "Alpha".into(), to: "Beta".into(), label: None }],
+        edges: vec![Edge {
+            from: "Alpha".into(),
+            to: "Beta".into(),
+            label: None,
+        }],
     });
     let result = render(&d, 40);
     assert_aligned(&result, 40);
@@ -96,7 +117,8 @@ fn dag_nodes_as_strings() {
 #[test]
 fn dag_mixed_string_and_object_nodes() {
     // Deserialization test via JSON
-    let json = r#"{"type":"dag","nodes":["A",{"id":"b","label":"Beta"}],"edges":[{"from":"A","to":"b"}]}"#;
+    let json =
+        r#"{"type":"dag","nodes":["A",{"id":"b","label":"Beta"}],"edges":[{"from":"A","to":"b"}]}"#;
     let input: DiagramInput = serde_json::from_str(json).unwrap();
     let result = render(&input.diagram, 30);
     assert_aligned(&result, 30);
@@ -112,7 +134,10 @@ fn tree_four_space_indent() {
     let d = Diagram::Tree(TreeDiagram {
         title: None,
         root: None,
-        indent: Some("project\n    src/\n        main.rs\n        lib.rs\n    tests/\n        test.rs".into()),
+        indent: Some(
+            "project\n    src/\n        main.rs\n        lib.rs\n    tests/\n        test.rs"
+                .into(),
+        ),
     });
     let result = render(&d, 40);
     assert_aligned(&result, 40);
@@ -220,16 +245,30 @@ fn dag_fan_out_parallel_nodes() {
         title: None,
         nodes: None,
         edges: vec![
-            Edge { from: "Root".into(), to: "A".into(), label: None },
-            Edge { from: "Root".into(), to: "B".into(), label: None },
-            Edge { from: "Root".into(), to: "C".into(), label: None },
+            Edge {
+                from: "Root".into(),
+                to: "A".into(),
+                label: None,
+            },
+            Edge {
+                from: "Root".into(),
+                to: "B".into(),
+                label: None,
+            },
+            Edge {
+                from: "Root".into(),
+                to: "C".into(),
+                label: None,
+            },
         ],
     });
     let result = render(&d, 40);
     assert_aligned(&result, 40);
     let output = result.output.unwrap();
     // A, B, C should be on the same line
-    assert!(output.lines().any(|l| l.contains('A') && l.contains('B') && l.contains('C')));
+    assert!(output
+        .lines()
+        .any(|l| l.contains('A') && l.contains('B') && l.contains('C')));
 }
 
 // --- Width boundaries ---
@@ -237,10 +276,48 @@ fn dag_fan_out_parallel_nodes() {
 #[test]
 fn all_types_at_width_5() {
     let diagrams: Vec<(&str, Diagram)> = vec![
-        ("freeform", Diagram::Freeform(FreeformDiagram { title: None, content: Some("x".into()), lines: None })),
-        ("flow", Diagram::Flow(FlowDiagram { title: None, direction: None, steps: Some(vec![FlowStep::Label("A".into())]), nodes: None, edges: None })),
-        ("dag", Diagram::Dag(DagDiagram { title: None, nodes: None, edges: vec![Edge { from: "A".into(), to: "B".into(), label: None }] })),
-        ("state", Diagram::State(StateDiagram { title: None, states: None, transitions: vec![Edge { from: "A".into(), to: "B".into(), label: None }] })),
+        (
+            "freeform",
+            Diagram::Freeform(FreeformDiagram {
+                title: None,
+                content: Some("x".into()),
+                lines: None,
+            }),
+        ),
+        (
+            "flow",
+            Diagram::Flow(FlowDiagram {
+                title: None,
+                direction: None,
+                steps: Some(vec![FlowStep::Label("A".into())]),
+                nodes: None,
+                edges: None,
+            }),
+        ),
+        (
+            "dag",
+            Diagram::Dag(DagDiagram {
+                title: None,
+                nodes: None,
+                edges: vec![Edge {
+                    from: "A".into(),
+                    to: "B".into(),
+                    label: None,
+                }],
+            }),
+        ),
+        (
+            "state",
+            Diagram::State(StateDiagram {
+                title: None,
+                states: None,
+                transitions: vec![Edge {
+                    from: "A".into(),
+                    to: "B".into(),
+                    label: None,
+                }],
+            }),
+        ),
     ];
     for (name, d) in &diagrams {
         let result = render(d, 5);

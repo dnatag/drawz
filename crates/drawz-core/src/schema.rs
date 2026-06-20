@@ -19,7 +19,9 @@ pub struct DiagramInput {
     pub diagram: Diagram,
 }
 
-fn default_width() -> u16 { 120 }
+fn default_width() -> u16 {
+    120
+}
 
 /// The diagram type, discriminated by the `type` field.
 #[derive(Debug, Deserialize)]

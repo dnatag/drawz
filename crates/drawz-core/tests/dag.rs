@@ -3,7 +3,11 @@ use drawz_core::render;
 use drawz_core::schema::*;
 
 fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
-    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected errors: {:?}",
+        result.errors
+    );
     let output = result.output.as_ref().expect("expected output");
     let widths: Vec<usize> = output.lines().map(display_width).collect();
     let first = widths[0];
@@ -28,16 +32,44 @@ fn dag_renders_layered_dependencies() {
     let d = Diagram::Dag(DagDiagram {
         title: Some("Build Graph".into()),
         nodes: Some(vec![
-            Node { id: Some("parse".into()), label: "Parse".into() },
-            Node { id: Some("lint".into()), label: "Lint".into() },
-            Node { id: Some("compile".into()), label: "Compile".into() },
-            Node { id: Some("link".into()), label: "Link".into() },
+            Node {
+                id: Some("parse".into()),
+                label: "Parse".into(),
+            },
+            Node {
+                id: Some("lint".into()),
+                label: "Lint".into(),
+            },
+            Node {
+                id: Some("compile".into()),
+                label: "Compile".into(),
+            },
+            Node {
+                id: Some("link".into()),
+                label: "Link".into(),
+            },
         ]),
         edges: vec![
-            Edge { from: "parse".into(), to: "lint".into(), label: None },
-            Edge { from: "parse".into(), to: "compile".into(), label: None },
-            Edge { from: "lint".into(), to: "link".into(), label: None },
-            Edge { from: "compile".into(), to: "link".into(), label: None },
+            Edge {
+                from: "parse".into(),
+                to: "lint".into(),
+                label: None,
+            },
+            Edge {
+                from: "parse".into(),
+                to: "compile".into(),
+                label: None,
+            },
+            Edge {
+                from: "lint".into(),
+                to: "link".into(),
+                label: None,
+            },
+            Edge {
+                from: "compile".into(),
+                to: "link".into(),
+                label: None,
+            },
         ],
     });
     let result = render(&d, 40);
@@ -54,9 +86,21 @@ fn dag_cycle_handling() {
         title: None,
         nodes: None,
         edges: vec![
-            Edge { from: "A".into(), to: "B".into(), label: None },
-            Edge { from: "B".into(), to: "C".into(), label: None },
-            Edge { from: "C".into(), to: "A".into(), label: None },
+            Edge {
+                from: "A".into(),
+                to: "B".into(),
+                label: None,
+            },
+            Edge {
+                from: "B".into(),
+                to: "C".into(),
+                label: None,
+            },
+            Edge {
+                from: "C".into(),
+                to: "A".into(),
+                label: None,
+            },
         ],
     });
     let result = render(&d, 30);
@@ -71,8 +115,16 @@ fn dag_parallel_nodes_in_layer() {
         title: None,
         nodes: None,
         edges: vec![
-            Edge { from: "A".into(), to: "C".into(), label: None },
-            Edge { from: "B".into(), to: "C".into(), label: None },
+            Edge {
+                from: "A".into(),
+                to: "C".into(),
+                label: None,
+            },
+            Edge {
+                from: "B".into(),
+                to: "C".into(),
+                label: None,
+            },
         ],
     });
     let result = render(&d, 40);
@@ -87,10 +139,26 @@ fn dag_many_parallel_nodes_narrow_width() {
         title: None,
         nodes: None,
         edges: vec![
-            Edge { from: "NodeAlpha".into(), to: "Final".into(), label: None },
-            Edge { from: "NodeBeta".into(), to: "Final".into(), label: None },
-            Edge { from: "NodeGamma".into(), to: "Final".into(), label: None },
-            Edge { from: "NodeDelta".into(), to: "Final".into(), label: None },
+            Edge {
+                from: "NodeAlpha".into(),
+                to: "Final".into(),
+                label: None,
+            },
+            Edge {
+                from: "NodeBeta".into(),
+                to: "Final".into(),
+                label: None,
+            },
+            Edge {
+                from: "NodeGamma".into(),
+                to: "Final".into(),
+                label: None,
+            },
+            Edge {
+                from: "NodeDelta".into(),
+                to: "Final".into(),
+                label: None,
+            },
         ],
     });
     let result = render(&d, 20);
@@ -101,7 +169,10 @@ fn dag_many_parallel_nodes_narrow_width() {
 fn dag_single_node_no_edges() {
     let d = Diagram::Dag(DagDiagram {
         title: None,
-        nodes: Some(vec![Node { id: None, label: "Standalone".into() }]),
+        nodes: Some(vec![Node {
+            id: None,
+            label: "Standalone".into(),
+        }]),
         edges: vec![],
     });
     let result = render(&d, 30);
@@ -115,10 +186,20 @@ fn dag_long_node_label_truncated() {
     let d = Diagram::Dag(DagDiagram {
         title: None,
         nodes: Some(vec![
-            Node { id: Some("a".into()), label: "A very long node label that exceeds width".into() },
-            Node { id: Some("b".into()), label: "Short".into() },
+            Node {
+                id: Some("a".into()),
+                label: "A very long node label that exceeds width".into(),
+            },
+            Node {
+                id: Some("b".into()),
+                label: "Short".into(),
+            },
         ]),
-        edges: vec![Edge { from: "a".into(), to: "b".into(), label: None }],
+        edges: vec![Edge {
+            from: "a".into(),
+            to: "b".into(),
+            label: None,
+        }],
     });
     let result = render(&d, 20);
     assert_aligned(&result, 20);
@@ -130,10 +211,26 @@ fn dag_diamond_dependency() {
         title: None,
         nodes: None,
         edges: vec![
-            Edge { from: "Start".into(), to: "Left".into(), label: None },
-            Edge { from: "Start".into(), to: "Right".into(), label: None },
-            Edge { from: "Left".into(), to: "End".into(), label: None },
-            Edge { from: "Right".into(), to: "End".into(), label: None },
+            Edge {
+                from: "Start".into(),
+                to: "Left".into(),
+                label: None,
+            },
+            Edge {
+                from: "Start".into(),
+                to: "Right".into(),
+                label: None,
+            },
+            Edge {
+                from: "Left".into(),
+                to: "End".into(),
+                label: None,
+            },
+            Edge {
+                from: "Right".into(),
+                to: "End".into(),
+                label: None,
+            },
         ],
     });
     let result = render(&d, 40);
@@ -149,8 +246,16 @@ fn dag_edge_labels() {
         title: None,
         nodes: None,
         edges: vec![
-            Edge { from: "A".into(), to: "B".into(), label: Some("depends".into()) },
-            Edge { from: "B".into(), to: "C".into(), label: Some("triggers".into()) },
+            Edge {
+                from: "A".into(),
+                to: "B".into(),
+                label: Some("depends".into()),
+            },
+            Edge {
+                from: "B".into(),
+                to: "C".into(),
+                label: Some("triggers".into()),
+            },
         ],
     });
     let result = render(&d, 40);
@@ -162,7 +267,11 @@ fn dag_title_rendering() {
     let d = Diagram::Dag(DagDiagram {
         title: Some("Deploy Pipeline".into()),
         nodes: None,
-        edges: vec![Edge { from: "Build".into(), to: "Deploy".into(), label: None }],
+        edges: vec![Edge {
+            from: "Build".into(),
+            to: "Deploy".into(),
+            label: None,
+        }],
     });
     let result = render(&d, 40);
     assert_aligned(&result, 40);
@@ -175,7 +284,11 @@ fn dag_self_referencing_edge() {
     let d = Diagram::Dag(DagDiagram {
         title: None,
         nodes: None,
-        edges: vec![Edge { from: "A".into(), to: "A".into(), label: None }],
+        edges: vec![Edge {
+            from: "A".into(),
+            to: "A".into(),
+            label: None,
+        }],
     });
     let result = render(&d, 30);
     assert!(result.output.is_some() || !result.errors.is_empty());
@@ -187,8 +300,16 @@ fn dag_duplicate_edges() {
         title: None,
         nodes: None,
         edges: vec![
-            Edge { from: "A".into(), to: "B".into(), label: None },
-            Edge { from: "A".into(), to: "B".into(), label: None },
+            Edge {
+                from: "A".into(),
+                to: "B".into(),
+                label: None,
+            },
+            Edge {
+                from: "A".into(),
+                to: "B".into(),
+                label: None,
+            },
         ],
     });
     let result = render(&d, 30);
@@ -200,7 +321,11 @@ fn dag_minimum_width() {
     let d = Diagram::Dag(DagDiagram {
         title: None,
         nodes: None,
-        edges: vec![Edge { from: "A".into(), to: "B".into(), label: None }],
+        edges: vec![Edge {
+            from: "A".into(),
+            to: "B".into(),
+            label: None,
+        }],
     });
     let result = render(&d, 4);
     assert!(result.output.is_some() || !result.errors.is_empty());

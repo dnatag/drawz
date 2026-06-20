@@ -80,7 +80,10 @@ impl ServerHandler for DrawzHandler {
     }
 }
 
-fn call_render(args: Option<serde_json::Map<String, Value>>, session_width: &AtomicU16) -> CallToolResult {
+fn call_render(
+    args: Option<serde_json::Map<String, Value>>,
+    session_width: &AtomicU16,
+) -> CallToolResult {
     let args = Value::Object(args.unwrap_or_default());
 
     let input: DiagramInput = match serde_json::from_value(args.clone()) {
@@ -93,16 +96,18 @@ fn call_render(args: Option<serde_json::Map<String, Value>>, session_width: &Ato
                 errors: vec![format!("invalid input: {e}")],
                 warnings: vec![],
             };
-            let mut result = CallToolResult::text_content(vec![
-                to_json(&resp).into(),
-            ]);
+            let mut result = CallToolResult::text_content(vec![to_json(&resp).into()]);
             result.is_error = Some(true);
             return result;
         }
     };
 
     // Detect if agent explicitly passed a width field (vs relying on default)
-    let explicit_width = args.as_object().and_then(|m| m.get("width")).and_then(|v| v.as_u64()).map(|w| w as u16);
+    let explicit_width = args
+        .as_object()
+        .and_then(|m| m.get("width"))
+        .and_then(|v| v.as_u64())
+        .map(|w| w as u16);
 
     let width = if let Some(w) = explicit_width {
         // Agent passed explicit width — remember it for the session
@@ -111,7 +116,11 @@ fn call_render(args: Option<serde_json::Map<String, Value>>, session_width: &Ato
     } else {
         // No explicit width — use session width if set, else default
         let sw = session_width.load(Ordering::Relaxed);
-        if sw > 0 { sw } else { input.width }
+        if sw > 0 {
+            sw
+        } else {
+            input.width
+        }
     };
 
     let result = drawz_core::render(&input.diagram, width);
@@ -120,7 +129,9 @@ fn call_render(args: Option<serde_json::Map<String, Value>>, session_width: &Ato
     let resp = RenderResponse {
         output: result.output.clone(),
         fit: result.fit,
-        rendered_width: result.output.as_ref()
+        rendered_width: result
+            .output
+            .as_ref()
             .and_then(|o| o.lines().next())
             .map(drawz_core::measure::display_width)
             .unwrap_or(0),

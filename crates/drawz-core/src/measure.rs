@@ -38,8 +38,9 @@ pub fn display_width(s: &str) -> usize {
                     }
                     if chars.peek() == Some(&'\u{200D}') {
                         chars.next(); // consume ZWJ
-                        // Skip variation selectors after ZWJ
-                        while chars.peek() == Some(&'\u{FE0E}') || chars.peek() == Some(&'\u{FE0F}') {
+                                      // Skip variation selectors after ZWJ
+                        while chars.peek() == Some(&'\u{FE0E}') || chars.peek() == Some(&'\u{FE0F}')
+                        {
                             chars.next();
                         }
                         // Consume joined char (don't add its width)
@@ -110,12 +111,16 @@ pub fn truncate(s: &str, max_width: usize) -> String {
             if width + ellipsis_width <= max_width {
                 result.push('…');
             }
-            if in_ansi { result.push_str("\x1b[0m"); }
+            if in_ansi {
+                result.push_str("\x1b[0m");
+            }
             return result;
         }
         if width + cw + ellipsis_width > max_width && chars.peek().is_some() {
             result.push('…');
-            if in_ansi { result.push_str("\x1b[0m"); }
+            if in_ansi {
+                result.push_str("\x1b[0m");
+            }
             return result;
         }
         width += cw;
@@ -271,7 +276,10 @@ mod tests {
     #[test]
     fn zwj_family_emoji() {
         // 👨‍👩‍👧‍👦 = single glyph, width 2
-        assert_eq!(display_width("\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466}"), 2);
+        assert_eq!(
+            display_width("\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466}"),
+            2
+        );
     }
 
     #[test]
@@ -291,7 +299,11 @@ mod tests {
         let zwj = "👨\u{200D}👩\u{200D}👧\u{200D}👦";
         assert_eq!(display_width(zwj), 2); // whole ZWJ family = 2 cols
         let t = truncate(zwj, 5);
-        assert!(display_width(&t) <= 5, "truncate result width {} > 5", display_width(&t));
+        assert!(
+            display_width(&t) <= 5,
+            "truncate result width {} > 5",
+            display_width(&t)
+        );
     }
 
     #[test]
@@ -300,7 +312,12 @@ mod tests {
         let s = "👨\u{200D}👩\u{200D}👧\u{200D}👦hello";
         assert_eq!(display_width(s), 7);
         let t = truncate(s, 4);
-        assert!(display_width(&t) <= 4, "truncate width {} > 4, got '{}'", display_width(&t), t);
+        assert!(
+            display_width(&t) <= 4,
+            "truncate width {} > 4, got '{}'",
+            display_width(&t),
+            t
+        );
     }
 
     #[test]
@@ -308,6 +325,10 @@ mod tests {
         let flag = "\u{1F1FA}\u{1F1F8}"; // US flag
         assert_eq!(display_width(flag), 2);
         let t = truncate(flag, 3);
-        assert!(display_width(&t) <= 3, "truncate result width {} > 3", display_width(&t));
+        assert!(
+            display_width(&t) <= 3,
+            "truncate result width {} > 3",
+            display_width(&t)
+        );
     }
 }

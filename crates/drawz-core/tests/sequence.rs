@@ -3,10 +3,15 @@ use drawz_core::render;
 use drawz_core::schema::*;
 
 fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
-    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected errors: {:?}",
+        result.errors
+    );
     let output = result.output.as_ref().expect("expected output");
     for line in output.lines() {
-        let first_w = output.lines().next().map(display_width).unwrap_or(0); assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
+        let first_w = output.lines().next().map(display_width).unwrap_or(0);
+        assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
     }
 }
 
@@ -27,9 +32,21 @@ fn sequence_diagram_renders_actors_and_messages() {
         title: Some("Auth Flow".into()),
         actors: vec!["Client".into(), "Auth".into(), "API".into()],
         messages: vec![
-            Message { from: "Client".into(), to: "Auth".into(), label: "login".into() },
-            Message { from: "Auth".into(), to: "API".into(), label: "token".into() },
-            Message { from: "API".into(), to: "Client".into(), label: "data".into() },
+            Message {
+                from: "Client".into(),
+                to: "Auth".into(),
+                label: "login".into(),
+            },
+            Message {
+                from: "Auth".into(),
+                to: "API".into(),
+                label: "token".into(),
+            },
+            Message {
+                from: "API".into(),
+                to: "Client".into(),
+                label: "data".into(),
+            },
         ],
     });
     let result = render(&d, 60);
@@ -45,7 +62,11 @@ fn sequence_self_message() {
     let d = Diagram::Sequence(SequenceDiagram {
         title: None,
         actors: vec!["A".into(), "B".into()],
-        messages: vec![Message { from: "A".into(), to: "A".into(), label: "self-call".into() }],
+        messages: vec![Message {
+            from: "A".into(),
+            to: "A".into(),
+            label: "self-call".into(),
+        }],
     });
     let result = render(&d, 40);
     assert_aligned(&result, 40);
@@ -57,8 +78,16 @@ fn sequence_right_to_left_arrow() {
         title: None,
         actors: vec!["Client".into(), "Server".into()],
         messages: vec![
-            Message { from: "Client".into(), to: "Server".into(), label: "request".into() },
-            Message { from: "Server".into(), to: "Client".into(), label: "response".into() },
+            Message {
+                from: "Client".into(),
+                to: "Server".into(),
+                label: "request".into(),
+            },
+            Message {
+                from: "Server".into(),
+                to: "Client".into(),
+                label: "response".into(),
+            },
         ],
     });
     let result = render(&d, 50);
@@ -71,7 +100,18 @@ fn sequence_right_to_left_arrow() {
 fn sequence_too_narrow_for_actors() {
     let d = Diagram::Sequence(SequenceDiagram {
         title: None,
-        actors: vec!["A".into(), "B".into(), "C".into(), "D".into(), "E".into(), "F".into(), "G".into(), "H".into(), "I".into(), "J".into()],
+        actors: vec![
+            "A".into(),
+            "B".into(),
+            "C".into(),
+            "D".into(),
+            "E".into(),
+            "F".into(),
+            "G".into(),
+            "H".into(),
+            "I".into(),
+            "J".into(),
+        ],
         messages: vec![],
     });
     let result = render(&d, 20);
@@ -83,7 +123,11 @@ fn sequence_long_actor_name_truncated() {
     let d = Diagram::Sequence(SequenceDiagram {
         title: None,
         actors: vec!["VeryLongActorName".into(), "AnotherLongName".into()],
-        messages: vec![Message { from: "VeryLongActorName".into(), to: "AnotherLongName".into(), label: "msg".into() }],
+        messages: vec![Message {
+            from: "VeryLongActorName".into(),
+            to: "AnotherLongName".into(),
+            label: "msg".into(),
+        }],
     });
     let result = render(&d, 25);
     assert_aligned(&result, 25);
@@ -94,7 +138,11 @@ fn sequence_unknown_actor_warning() {
     let d = Diagram::Sequence(SequenceDiagram {
         title: None,
         actors: vec!["A".into(), "B".into()],
-        messages: vec![Message { from: "A".into(), to: "Unknown".into(), label: "x".into() }],
+        messages: vec![Message {
+            from: "A".into(),
+            to: "Unknown".into(),
+            label: "x".into(),
+        }],
     });
     let result = render(&d, 40);
     assert!(!result.warnings.is_empty());
@@ -106,8 +154,16 @@ fn sequence_many_actors_alignment() {
         title: None,
         actors: vec!["A".into(), "B".into(), "C".into(), "D".into()],
         messages: vec![
-            Message { from: "A".into(), to: "D".into(), label: "skip".into() },
-            Message { from: "D".into(), to: "B".into(), label: "back".into() },
+            Message {
+                from: "A".into(),
+                to: "D".into(),
+                label: "skip".into(),
+            },
+            Message {
+                from: "D".into(),
+                to: "B".into(),
+                label: "back".into(),
+            },
         ],
     });
     let result = render(&d, 60);
@@ -134,7 +190,11 @@ fn sequence_title_rendering() {
     let d = Diagram::Sequence(SequenceDiagram {
         title: Some("Login Flow".into()),
         actors: vec!["User".into(), "Server".into()],
-        messages: vec![Message { from: "User".into(), to: "Server".into(), label: "auth".into() }],
+        messages: vec![Message {
+            from: "User".into(),
+            to: "Server".into(),
+            label: "auth".into(),
+        }],
     });
     let result = render(&d, 50);
     assert_aligned(&result, 50);
@@ -160,7 +220,11 @@ fn sequence_duplicate_actors() {
     let d = Diagram::Sequence(SequenceDiagram {
         title: None,
         actors: vec!["A".into(), "A".into(), "B".into()],
-        messages: vec![Message { from: "A".into(), to: "B".into(), label: "msg".into() }],
+        messages: vec![Message {
+            from: "A".into(),
+            to: "B".into(),
+            label: "msg".into(),
+        }],
     });
     let result = render(&d, 40);
     assert!(result.output.is_some() || !result.errors.is_empty());
@@ -171,7 +235,11 @@ fn sequence_minimum_width() {
     let d = Diagram::Sequence(SequenceDiagram {
         title: None,
         actors: vec!["A".into(), "B".into()],
-        messages: vec![Message { from: "A".into(), to: "B".into(), label: "x".into() }],
+        messages: vec![Message {
+            from: "A".into(),
+            to: "B".into(),
+            label: "x".into(),
+        }],
     });
     let result = render(&d, 4);
     assert!(result.output.is_some() || !result.errors.is_empty());

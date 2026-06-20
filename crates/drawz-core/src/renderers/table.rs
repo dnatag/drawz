@@ -7,7 +7,10 @@ use crate::schema::TableDiagram;
 /// # Errors
 ///
 /// Returns an error if headers are empty or the table cannot fit at the given width.
-pub(crate) fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(
+    diagram: &TableDiagram,
+    ctx: &mut RenderContext,
+) -> Result<Vec<String>, String> {
     if diagram.headers.is_empty() {
         return Err("table requires at least one header".to_string());
     }
@@ -55,7 +58,9 @@ pub(crate) fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<
             // Over-allocated due to .max(3) — shrink last columns to fit
             let mut excess = sum - available;
             for w in col_widths.iter_mut().rev() {
-                if excess == 0 { break; }
+                if excess == 0 {
+                    break;
+                }
                 let reduce = excess.min(w.saturating_sub(3));
                 *w -= reduce;
                 excess -= reduce;
@@ -63,7 +68,8 @@ pub(crate) fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<
         }
         let final_sum: usize = col_widths.iter().sum();
         if truncated || final_sum > available {
-            ctx.warnings.push("suggestion: reduce columns or set wider width".to_string());
+            ctx.warnings
+                .push("suggestion: reduce columns or set wider width".to_string());
         }
     }
 
@@ -72,7 +78,8 @@ pub(crate) fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<
     // Top border: ┌───┬───┐
     let top: String = format!(
         "┌{}┐",
-        col_widths.iter()
+        col_widths
+            .iter()
             .map(|w| "─".repeat(*w + 2))
             .collect::<Vec<_>>()
             .join("┬")
@@ -82,7 +89,10 @@ pub(crate) fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<
     // Header row: │ H1 │ H2 │
     let header: String = format!(
         "│{}│",
-        diagram.headers.iter().enumerate()
+        diagram
+            .headers
+            .iter()
+            .enumerate()
             .map(|(i, h)| format!(" {} ", fit_cell(h, col_widths[i])))
             .collect::<Vec<_>>()
             .join("│")
@@ -92,7 +102,8 @@ pub(crate) fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<
     // Header separator: ├───┼───┤
     let header_sep: String = format!(
         "├{}┤",
-        col_widths.iter()
+        col_widths
+            .iter()
             .map(|w| "─".repeat(*w + 2))
             .collect::<Vec<_>>()
             .join("┼")
@@ -122,7 +133,8 @@ pub(crate) fn render(diagram: &TableDiagram, ctx: &mut RenderContext) -> Result<
     // Bottom border: └───┴───┘
     let bottom: String = format!(
         "└{}┘",
-        col_widths.iter()
+        col_widths
+            .iter()
             .map(|w| "─".repeat(*w + 2))
             .collect::<Vec<_>>()
             .join("┴")
@@ -154,7 +166,11 @@ mod tests {
     use crate::schema::TableDiagram;
 
     fn ctx(width: usize) -> RenderContext {
-        RenderContext { inner_width: width, total_width: u16::try_from(width).unwrap(), warnings: Vec::new() }
+        RenderContext {
+            inner_width: width,
+            total_width: u16::try_from(width).unwrap(),
+            warnings: Vec::new(),
+        }
     }
 
     #[test]
@@ -167,7 +183,9 @@ mod tests {
         let lines = render(&d, &mut ctx(20)).unwrap();
         // top + header + header_sep + 1 row + bottom = 5
         assert_eq!(lines.len(), 5);
-        for l in &lines { assert_eq!(display_width(l), 20); }
+        for l in &lines {
+            assert_eq!(display_width(l), 20);
+        }
         assert!(lines[0].contains('┌'));
         assert!(lines[2].contains('┼'));
         assert!(lines[4].contains('┘'));
@@ -175,7 +193,11 @@ mod tests {
 
     #[test]
     fn should_return_error_when_headers_empty() {
-        let d = TableDiagram { title: None, headers: vec![], rows: vec![] };
+        let d = TableDiagram {
+            title: None,
+            headers: vec![],
+            rows: vec![],
+        };
         assert!(render(&d, &mut ctx(20)).is_err());
     }
 
@@ -188,7 +210,9 @@ mod tests {
         };
         let mut c = ctx(15);
         let lines = render(&d, &mut c).unwrap();
-        for l in &lines { assert_eq!(display_width(l), 15); }
+        for l in &lines {
+            assert_eq!(display_width(l), 15);
+        }
         assert!(!c.warnings.is_empty());
     }
 
@@ -202,7 +226,9 @@ mod tests {
         let lines = render(&d, &mut ctx(30)).unwrap();
         // top + header + header_sep + 1 row + bottom = 5
         assert_eq!(lines.len(), 5);
-        for l in &lines { assert_eq!(display_width(l), 30); }
+        for l in &lines {
+            assert_eq!(display_width(l), 30);
+        }
     }
 
     #[test]

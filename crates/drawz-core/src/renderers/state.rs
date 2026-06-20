@@ -7,7 +7,10 @@ use crate::schema::StateDiagram;
 /// # Errors
 ///
 /// Returns an error if transitions are empty.
-pub(crate) fn render(diagram: &StateDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(
+    diagram: &StateDiagram,
+    ctx: &mut RenderContext,
+) -> Result<Vec<String>, String> {
     if diagram.transitions.is_empty() {
         return Err("state diagram requires at least one transition".to_string());
     }
@@ -38,7 +41,11 @@ pub(crate) fn render(diagram: &StateDiagram, ctx: &mut RenderContext) -> Result<
         lines.extend(box_lines);
 
         // Render self-loop transitions for this state
-        for t in diagram.transitions.iter().filter(|t| t.from == state && t.to == state) {
+        for t in diagram
+            .transitions
+            .iter()
+            .filter(|t| t.from == state && t.to == state)
+        {
             let label = t.label.as_deref().unwrap_or("");
             let arrow = format!("  ↺ {label}");
             lines.push(fit_line(&arrow, ctx));
@@ -49,9 +56,10 @@ pub(crate) fn render(diagram: &StateDiagram, ctx: &mut RenderContext) -> Result<
             let next_state = state_labels[i + 1];
 
             // Transition to next state in linear order (label on connector)
-            let to_next = diagram.transitions.iter().find(|t| {
-                t.from == state && t.to == next_state
-            });
+            let to_next = diagram
+                .transitions
+                .iter()
+                .find(|t| t.from == state && t.to == next_state);
 
             if let Some(t) = to_next {
                 if let Some(label) = &t.label {
@@ -65,9 +73,11 @@ pub(crate) fn render(diagram: &StateDiagram, ctx: &mut RenderContext) -> Result<
             }
 
             // Branching transitions to other states (not next, not self)
-            for t in diagram.transitions.iter().filter(|t| {
-                t.from == state && t.to != state && t.to != next_state
-            }) {
+            for t in diagram
+                .transitions
+                .iter()
+                .filter(|t| t.from == state && t.to != state && t.to != next_state)
+            {
                 let label = t.label.as_deref().unwrap_or("");
                 let branch = if label.is_empty() {
                     format!("  │ → {}", t.to)
@@ -80,9 +90,11 @@ pub(crate) fn render(diagram: &StateDiagram, ctx: &mut RenderContext) -> Result<
             lines.push(fit_line("  ▼", ctx));
         } else {
             // Last state: show branching transitions (not self)
-            for t in diagram.transitions.iter().filter(|t| {
-                t.from == state && t.to != state
-            }) {
+            for t in diagram
+                .transitions
+                .iter()
+                .filter(|t| t.from == state && t.to != state)
+            {
                 let label = t.label.as_deref().unwrap_or("");
                 let branch = if label.is_empty() {
                     format!("  │ → {}", t.to)
@@ -100,7 +112,8 @@ pub(crate) fn render(diagram: &StateDiagram, ctx: &mut RenderContext) -> Result<
 fn render_state_box(label: &str, ctx: &mut RenderContext) -> Vec<String> {
     let max_label_w = ctx.inner_width.saturating_sub(6); // "( " + label + " )"
     let fitted = if display_width(label) > max_label_w {
-        ctx.warnings.push("suggestion: some state names truncated to fit width".to_string());
+        ctx.warnings
+            .push("suggestion: some state names truncated to fit width".to_string());
         truncate(label, max_label_w)
     } else {
         label.to_string()
@@ -135,23 +148,38 @@ mod tests {
     use crate::schema::{Edge, Node, StateDiagram};
 
     fn ctx(width: usize) -> RenderContext {
-        RenderContext { inner_width: width, total_width: u16::try_from(width).unwrap(), warnings: Vec::new() }
+        RenderContext {
+            inner_width: width,
+            total_width: u16::try_from(width).unwrap(),
+            warnings: Vec::new(),
+        }
     }
 
     #[test]
     fn should_render_rounded_boxes_when_transitions_provided() {
         let d = StateDiagram {
-            title: None, states: None,
+            title: None,
+            states: None,
             transitions: vec![
-                Edge { from: "A".into(), to: "B".into(), label: Some("go".into()) },
-                Edge { from: "B".into(), to: "C".into(), label: None },
+                Edge {
+                    from: "A".into(),
+                    to: "B".into(),
+                    label: Some("go".into()),
+                },
+                Edge {
+                    from: "B".into(),
+                    to: "C".into(),
+                    label: None,
+                },
             ],
         };
         let lines = render(&d, &mut ctx(30)).unwrap();
         assert!(lines.iter().any(|l| l.contains('A')));
         assert!(lines.iter().any(|l| l.contains("go")));
         assert!(lines.iter().any(|l| l.contains("╭")));
-        for l in &lines { assert_eq!(display_width(l), 30); }
+        for l in &lines {
+            assert_eq!(display_width(l), 30);
+        }
     }
 
     #[test]
@@ -159,32 +187,65 @@ mod tests {
         let d = StateDiagram {
             title: None,
             states: Some(vec![
-                Node { id: None, label: "Start".into() },
-                Node { id: None, label: "End".into() },
+                Node {
+                    id: None,
+                    label: "Start".into(),
+                },
+                Node {
+                    id: None,
+                    label: "End".into(),
+                },
             ]),
-            transitions: vec![Edge { from: "Start".into(), to: "End".into(), label: None }],
+            transitions: vec![Edge {
+                from: "Start".into(),
+                to: "End".into(),
+                label: None,
+            }],
         };
         let lines = render(&d, &mut ctx(30)).unwrap();
         assert!(lines.iter().any(|l| l.contains("Start")));
         assert!(lines.iter().any(|l| l.contains("End")));
-        for l in &lines { assert_eq!(display_width(l), 30); }
+        for l in &lines {
+            assert_eq!(display_width(l), 30);
+        }
     }
 
     #[test]
     fn should_return_error_when_transitions_empty() {
-        let d = StateDiagram { title: None, states: None, transitions: vec![] };
+        let d = StateDiagram {
+            title: None,
+            states: None,
+            transitions: vec![],
+        };
         assert!(render(&d, &mut ctx(30)).is_err());
     }
 
     #[test]
     fn should_show_branching_transitions_when_state_has_multiple_targets() {
         let d = StateDiagram {
-            title: None, states: None,
+            title: None,
+            states: None,
             transitions: vec![
-                Edge { from: "A".into(), to: "B".into(), label: Some("x".into()) },
-                Edge { from: "A".into(), to: "C".into(), label: Some("y".into()) },
-                Edge { from: "A".into(), to: "D".into(), label: Some("z".into()) },
-                Edge { from: "B".into(), to: "C".into(), label: None },
+                Edge {
+                    from: "A".into(),
+                    to: "B".into(),
+                    label: Some("x".into()),
+                },
+                Edge {
+                    from: "A".into(),
+                    to: "C".into(),
+                    label: Some("y".into()),
+                },
+                Edge {
+                    from: "A".into(),
+                    to: "D".into(),
+                    label: Some("z".into()),
+                },
+                Edge {
+                    from: "B".into(),
+                    to: "C".into(),
+                    label: None,
+                },
             ],
         };
         let lines = render(&d, &mut ctx(30)).unwrap();
@@ -192,20 +253,26 @@ mod tests {
         assert!(lines.iter().any(|l| l.contains('x')));
         assert!(lines.iter().any(|l| l.contains("y → C")));
         assert!(lines.iter().any(|l| l.contains("z → D")));
-        for l in &lines { assert_eq!(display_width(l), 30); }
+        for l in &lines {
+            assert_eq!(display_width(l), 30);
+        }
     }
 
     #[test]
     fn should_truncate_when_state_name_exceeds_width() {
         let d = StateDiagram {
-            title: None, states: None,
+            title: None,
+            states: None,
             transitions: vec![Edge {
                 from: "a_very_long_state_name_here".into(),
-                to: "b".into(), label: None,
+                to: "b".into(),
+                label: None,
             }],
         };
         let mut c = ctx(15);
         let lines = render(&d, &mut c).unwrap();
-        for l in &lines { assert_eq!(display_width(l), 15); }
+        for l in &lines {
+            assert_eq!(display_width(l), 15);
+        }
     }
 }

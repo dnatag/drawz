@@ -18,7 +18,10 @@ pub fn parse(code: &str) -> Result<Diagram, String> {
     } else if trimmed.starts_with("stateDiagram") {
         state::parse_state(trimmed)
     } else {
-        Err("unsupported mermaid diagram type. Supported: flowchart, sequenceDiagram, stateDiagram".to_string())
+        Err(
+            "unsupported mermaid diagram type. Supported: flowchart, sequenceDiagram, stateDiagram"
+                .to_string(),
+        )
     }
 }
 

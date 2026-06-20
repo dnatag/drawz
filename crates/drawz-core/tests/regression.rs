@@ -5,7 +5,11 @@ use drawz_core::render;
 use drawz_core::schema::*;
 
 fn assert_aligned(result: &drawz_core::RenderResult) {
-    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected errors: {:?}",
+        result.errors
+    );
     let output = result.output.as_ref().expect("expected output");
     let first_w = output.lines().next().map(display_width).unwrap_or(0);
     for line in output.lines() {
@@ -28,10 +32,14 @@ fn mermaid_hyphenated_node_ids_parsed_correctly() {
     assert!(output.contains("user-service"), "missing user-service node");
     assert!(output.contains("database"), "missing database node");
     // Should NOT have a spurious "user" node
-    let lines_with_user: Vec<&str> = output.lines()
+    let lines_with_user: Vec<&str> = output
+        .lines()
         .filter(|l| l.contains("user") && !l.contains("user-service"))
         .collect();
-    assert!(lines_with_user.is_empty(), "spurious 'user' node found: {lines_with_user:?}");
+    assert!(
+        lines_with_user.is_empty(),
+        "spurious 'user' node found: {lines_with_user:?}"
+    );
 }
 
 #[test]
@@ -79,9 +87,9 @@ fn mermaid_subgraph_not_rendered_as_node() {
     assert!(output.contains('D'));
     assert!(!output.contains("subgraph"), "subgraph rendered as node");
     // "end" should not appear as a standalone node label
-    let end_as_node = output.lines().any(|l| {
-        l.contains("│ end │") || l.contains("│ end  ")
-    });
+    let end_as_node = output
+        .lines()
+        .any(|l| l.contains("│ end │") || l.contains("│ end  "));
     assert!(!end_as_node, "'end' rendered as node");
 }
 
@@ -106,7 +114,9 @@ fn flow_lr_falls_back_to_vertical_when_too_narrow() {
     // Vertical: each label on separate line
     assert!(output.contains("Alpha"));
     assert!(output.contains("Beta"));
-    assert!(!output.lines().any(|l| l.contains("Alpha") && l.contains("Beta")));
+    assert!(!output
+        .lines()
+        .any(|l| l.contains("Alpha") && l.contains("Beta")));
 }
 
 #[test]
@@ -132,13 +142,30 @@ fn flow_node_edge_mode_renders() {
         direction: None,
         steps: None,
         nodes: Some(vec![
-            Node { id: Some("Start".into()), label: "Start".into() },
-            Node { id: Some("Middle".into()), label: "Middle".into() },
-            Node { id: Some("End".into()), label: "End".into() },
+            Node {
+                id: Some("Start".into()),
+                label: "Start".into(),
+            },
+            Node {
+                id: Some("Middle".into()),
+                label: "Middle".into(),
+            },
+            Node {
+                id: Some("End".into()),
+                label: "End".into(),
+            },
         ]),
         edges: Some(vec![
-            Edge { from: "Start".into(), to: "Middle".into(), label: None },
-            Edge { from: "Middle".into(), to: "End".into(), label: None },
+            Edge {
+                from: "Start".into(),
+                to: "Middle".into(),
+                label: None,
+            },
+            Edge {
+                from: "Middle".into(),
+                to: "End".into(),
+                label: None,
+            },
         ]),
     });
     let result = render(&d, 40);
@@ -154,7 +181,10 @@ fn flow_node_edge_mode_renders() {
 fn dag_single_node_no_edges() {
     let d = Diagram::Dag(DagDiagram {
         title: None,
-        nodes: Some(vec![Node { id: None, label: "Alone".into() }]),
+        nodes: Some(vec![Node {
+            id: None,
+            label: "Alone".into(),
+        }]),
         edges: vec![],
     });
     // Should not error — single node is valid
@@ -169,8 +199,16 @@ fn dag_disconnected_components() {
         title: None,
         nodes: None,
         edges: vec![
-            Edge { from: "A".into(), to: "B".into(), label: None },
-            Edge { from: "C".into(), to: "D".into(), label: None },
+            Edge {
+                from: "A".into(),
+                to: "B".into(),
+                label: None,
+            },
+            Edge {
+                from: "C".into(),
+                to: "D".into(),
+                label: None,
+            },
         ],
     });
     let result = render(&d, 50);
@@ -182,12 +220,18 @@ fn dag_disconnected_components() {
 
 #[test]
 fn dag_long_chain_10_nodes() {
-    let edges: Vec<Edge> = (0..9).map(|i| Edge {
-        from: format!("N{i}"),
-        to: format!("N{}", i + 1),
-        label: None,
-    }).collect();
-    let d = Diagram::Dag(DagDiagram { title: None, nodes: None, edges });
+    let edges: Vec<Edge> = (0..9)
+        .map(|i| Edge {
+            from: format!("N{i}"),
+            to: format!("N{}", i + 1),
+            label: None,
+        })
+        .collect();
+    let d = Diagram::Dag(DagDiagram {
+        title: None,
+        nodes: None,
+        edges,
+    });
     let result = render(&d, 30);
     assert_aligned(&result);
     let output = result.output.unwrap();
@@ -286,8 +330,16 @@ fn state_self_transition() {
         title: None,
         states: None,
         transitions: vec![
-            Edge { from: "Retry".into(), to: "Retry".into(), label: Some("timeout".into()) },
-            Edge { from: "Retry".into(), to: "Done".into(), label: Some("success".into()) },
+            Edge {
+                from: "Retry".into(),
+                to: "Retry".into(),
+                label: Some("timeout".into()),
+            },
+            Edge {
+                from: "Retry".into(),
+                to: "Done".into(),
+                label: Some("success".into()),
+            },
         ],
     });
     let result = render(&d, 40);
@@ -464,7 +516,8 @@ fn mermaid_node_with_curly_braces() {
 fn mermaid_state_star_states() {
     let d = Diagram::Mermaid(MermaidDiagram {
         title: None,
-        code: "stateDiagram-v2\n    [*] --> Idle\n    Idle --> Active : start\n    Active --> [*]".into(),
+        code: "stateDiagram-v2\n    [*] --> Idle\n    Idle --> Active : start\n    Active --> [*]"
+            .into(),
     });
     let result = render(&d, 50);
     assert_aligned(&result);

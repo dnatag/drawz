@@ -18,14 +18,21 @@ pub fn render(diagram: &Diagram, width: u16) -> RenderResult {
 
     let framed = matches!(
         diagram,
-        Diagram::Freeform(_) | Diagram::Flow(_) | Diagram::State(_)
-            | Diagram::Sequence(_) | Diagram::Dag(_)
+        Diagram::Freeform(_)
+            | Diagram::Flow(_)
+            | Diagram::State(_)
+            | Diagram::Sequence(_)
+            | Diagram::Dag(_)
     );
 
     // Use requested width as inner_width for layout hints, but renderers
     // that can render at natural size (horizontal flow, DAG) will overflow.
     // The post-processing step trims and re-aligns all lines.
-    let inner_width = if framed { (width as usize).saturating_sub(4) } else { width as usize };
+    let inner_width = if framed {
+        (width as usize).saturating_sub(4)
+    } else {
+        width as usize
+    };
     let mut ctx = RenderContext {
         inner_width,
         total_width: width,
@@ -65,23 +72,26 @@ pub fn render(diagram: &Diagram, width: u16) -> RenderResult {
         },
         Ok(lines) => {
             // Check if any line exceeds the requested inner width
-            let max_line_w = lines.iter()
+            let max_line_w = lines
+                .iter()
                 .map(|l| crate::measure::display_width(l.trim_end()))
                 .max()
                 .unwrap_or(0);
 
             let (output_lines, content_width) = if max_line_w > inner_width {
                 // Content overflows — render at natural size (no truncation)
-                let trimmed: Vec<String> = lines.iter()
-                    .map(|l| l.trim_end().to_string())
-                    .collect();
-                let natural_width = trimmed.iter()
+                let trimmed: Vec<String> = lines.iter().map(|l| l.trim_end().to_string()).collect();
+                let natural_width = trimmed
+                    .iter()
                     .map(|l| crate::measure::display_width(l))
                     .max()
                     .unwrap_or(0);
-                let title_width = title.map(|t| crate::measure::display_width(t) + 4).unwrap_or(0);
+                let title_width = title
+                    .map(|t| crate::measure::display_width(t) + 4)
+                    .unwrap_or(0);
                 let final_width = natural_width.max(title_width);
-                let aligned: Vec<String> = trimmed.iter()
+                let aligned: Vec<String> = trimmed
+                    .iter()
                     .map(|l| crate::measure::pad_right(l, final_width))
                     .collect();
                 if framed {

@@ -3,10 +3,15 @@ use drawz_core::render;
 use drawz_core::schema::*;
 
 fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
-    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected errors: {:?}",
+        result.errors
+    );
     let output = result.output.as_ref().expect("expected output");
     for line in output.lines() {
-        let first_w = output.lines().next().map(display_width).unwrap_or(0); assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
+        let first_w = output.lines().next().map(display_width).unwrap_or(0);
+        assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
     }
 }
 
@@ -27,8 +32,16 @@ fn state_transitions_alignment() {
         title: None,
         states: None,
         transitions: vec![
-            Edge { from: "Idle".into(), to: "Running".into(), label: Some("start".into()) },
-            Edge { from: "Running".into(), to: "Done".into(), label: None },
+            Edge {
+                from: "Idle".into(),
+                to: "Running".into(),
+                label: Some("start".into()),
+            },
+            Edge {
+                from: "Running".into(),
+                to: "Done".into(),
+                label: None,
+            },
         ],
     });
     let result = render(&d, 30);
@@ -57,9 +70,21 @@ fn state_renders_rounded_boxes_with_labels() {
         title: Some("Order Lifecycle".into()),
         states: None,
         transitions: vec![
-            Edge { from: "Created".into(), to: "Paid".into(), label: Some("pay".into()) },
-            Edge { from: "Paid".into(), to: "Shipped".into(), label: Some("ship".into()) },
-            Edge { from: "Shipped".into(), to: "Delivered".into(), label: None },
+            Edge {
+                from: "Created".into(),
+                to: "Paid".into(),
+                label: Some("pay".into()),
+            },
+            Edge {
+                from: "Paid".into(),
+                to: "Shipped".into(),
+                label: Some("ship".into()),
+            },
+            Edge {
+                from: "Shipped".into(),
+                to: "Delivered".into(),
+                label: None,
+            },
         ],
     });
     let result = render(&d, 40);
@@ -80,10 +105,26 @@ fn complex_state_machine() {
         title: Some("TCP Connection".into()),
         states: None,
         transitions: vec![
-            Edge { from: "CLOSED".into(), to: "SYN_SENT".into(), label: Some("connect()".into()) },
-            Edge { from: "SYN_SENT".into(), to: "ESTABLISHED".into(), label: Some("SYN+ACK".into()) },
-            Edge { from: "ESTABLISHED".into(), to: "FIN_WAIT".into(), label: Some("close()".into()) },
-            Edge { from: "FIN_WAIT".into(), to: "CLOSED".into(), label: Some("ACK".into()) },
+            Edge {
+                from: "CLOSED".into(),
+                to: "SYN_SENT".into(),
+                label: Some("connect()".into()),
+            },
+            Edge {
+                from: "SYN_SENT".into(),
+                to: "ESTABLISHED".into(),
+                label: Some("SYN+ACK".into()),
+            },
+            Edge {
+                from: "ESTABLISHED".into(),
+                to: "FIN_WAIT".into(),
+                label: Some("close()".into()),
+            },
+            Edge {
+                from: "FIN_WAIT".into(),
+                to: "CLOSED".into(),
+                label: Some("ACK".into()),
+            },
         ],
     });
     let result = render(&d, 40);

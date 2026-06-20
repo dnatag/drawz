@@ -75,7 +75,11 @@ fn parse_flow_statement(stmt: &str, nodes: &mut Vec<Node>, edges: &mut Vec<Edge>
 
             register_node(left, nodes);
             register_node(&immediate, nodes);
-            edges.push(Edge { from: from_id, to: to_id, label });
+            edges.push(Edge {
+                from: from_id,
+                to: to_id,
+                label,
+            });
 
             if immediate.len() < target.len() {
                 parse_flow_statement(&target, nodes, edges);
@@ -95,10 +99,18 @@ fn extract_immediate_node(s: &str) -> String {
     while i < bytes.len() {
         match bytes[i] {
             b'[' | b'(' | b'{' => {
-                let close = match bytes[i] { b'[' => b']', b'(' => b')', _ => b'}' };
+                let close = match bytes[i] {
+                    b'[' => b']',
+                    b'(' => b')',
+                    _ => b'}',
+                };
                 i += 1;
-                while i < bytes.len() && bytes[i] != close { i += 1; }
-                if i < bytes.len() { i += 1; }
+                while i < bytes.len() && bytes[i] != close {
+                    i += 1;
+                }
+                if i < bytes.len() {
+                    i += 1;
+                }
             }
             b'-' | b'=' | b'.' => {
                 // Only split if this is the start of a full arrow pattern
@@ -142,7 +154,10 @@ fn register_node(s: &str, nodes: &mut Vec<Node>) {
     };
 
     if !nodes.iter().any(|n| n.id.as_deref() == Some(&id)) {
-        nodes.push(Node { id: Some(id), label });
+        nodes.push(Node {
+            id: Some(id),
+            label,
+        });
     }
 }
 
@@ -248,7 +263,10 @@ mod tests {
         let d = parse_flowchart("graph LR\nA-->B\nA-->C").unwrap();
         if let Diagram::Dag(dag) = d {
             let nodes = dag.nodes.unwrap();
-            let a_count = nodes.iter().filter(|n| n.id.as_deref() == Some("A")).count();
+            let a_count = nodes
+                .iter()
+                .filter(|n| n.id.as_deref() == Some("A"))
+                .count();
             assert_eq!(a_count, 1);
         } else {
             panic!("expected Dag for branching graph");

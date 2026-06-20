@@ -49,7 +49,9 @@ pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Ve
         .filter_map(|e| {
             let from = node_ids.iter().position(|&n| n == e.from)?;
             let to = node_ids.iter().position(|&n| n == e.to)?;
-            if from == to { return None; }
+            if from == to {
+                return None;
+            }
             Some((from, to))
         })
         .collect();
@@ -99,9 +101,22 @@ fn render_level(labels: &[&str], _ctx: &mut RenderContext, out: &mut Vec<String>
     let widths: Vec<usize> = labels.iter().map(|l| display_width(l) + 4).collect();
     let sep = " ".repeat(spacing);
 
-    let top: String = widths.iter().map(|&w| format!("┌{}┐", "─".repeat(w - 2))).collect::<Vec<_>>().join(&sep);
-    let mid: String = labels.iter().zip(&widths).map(|(&l, &w)| format!("│ {} │", pad_right(l, w - 4))).collect::<Vec<_>>().join(&sep);
-    let bot: String = widths.iter().map(|&w| format!("└{}┘", "─".repeat(w - 2))).collect::<Vec<_>>().join(&sep);
+    let top: String = widths
+        .iter()
+        .map(|&w| format!("┌{}┐", "─".repeat(w - 2)))
+        .collect::<Vec<_>>()
+        .join(&sep);
+    let mid: String = labels
+        .iter()
+        .zip(&widths)
+        .map(|(&l, &w)| format!("│ {} │", pad_right(l, w - 4)))
+        .collect::<Vec<_>>()
+        .join(&sep);
+    let bot: String = widths
+        .iter()
+        .map(|&w| format!("└{}┘", "─".repeat(w - 2)))
+        .collect::<Vec<_>>()
+        .join(&sep);
 
     out.push(top);
     out.push(mid);
@@ -126,29 +141,53 @@ mod tests {
     use crate::schema::{DagDiagram, Edge, Node};
 
     fn ctx(width: usize) -> RenderContext {
-        RenderContext { inner_width: width, total_width: u16::try_from(width).unwrap(), warnings: Vec::new() }
+        RenderContext {
+            inner_width: width,
+            total_width: u16::try_from(width).unwrap(),
+            warnings: Vec::new(),
+        }
     }
 
     #[test]
     fn should_render_layers_when_edges_provided() {
         let d = DagDiagram {
-            title: None, nodes: None,
+            title: None,
+            nodes: None,
             edges: vec![
-                Edge { from: "A".into(), to: "B".into(), label: None },
-                Edge { from: "A".into(), to: "C".into(), label: None },
-                Edge { from: "B".into(), to: "D".into(), label: None },
-                Edge { from: "C".into(), to: "D".into(), label: None },
+                Edge {
+                    from: "A".into(),
+                    to: "B".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "A".into(),
+                    to: "C".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "B".into(),
+                    to: "D".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "C".into(),
+                    to: "D".into(),
+                    label: None,
+                },
             ],
         };
         let lines = render(&d, &mut ctx(40)).unwrap();
         assert!(lines.iter().any(|l| l.contains('A')));
         assert!(lines.iter().any(|l| l.contains('D')));
-        
     }
 
     #[test]
     fn should_return_error_when_no_edges_or_nodes() {
-        let d = DagDiagram { title: None, nodes: None, edges: vec![] };
+        let d = DagDiagram {
+            title: None,
+            nodes: None,
+            edges: vec![],
+        };
         assert!(render(&d, &mut ctx(40)).is_err());
     }
 
@@ -157,26 +196,52 @@ mod tests {
         let d = DagDiagram {
             title: None,
             nodes: Some(vec![
-                Node { id: Some("a".into()), label: "Start".into() },
-                Node { id: Some("b".into()), label: "End".into() },
+                Node {
+                    id: Some("a".into()),
+                    label: "Start".into(),
+                },
+                Node {
+                    id: Some("b".into()),
+                    label: "End".into(),
+                },
             ]),
-            edges: vec![Edge { from: "a".into(), to: "b".into(), label: None }],
+            edges: vec![Edge {
+                from: "a".into(),
+                to: "b".into(),
+                label: None,
+            }],
         };
         let lines = render(&d, &mut ctx(30)).unwrap();
         assert!(lines.iter().any(|l| l.contains("Start")));
         assert!(lines.iter().any(|l| l.contains("End")));
-        
     }
 
     #[test]
     fn should_render_diamond_pattern() {
         let d = DagDiagram {
-            title: None, nodes: None,
+            title: None,
+            nodes: None,
             edges: vec![
-                Edge { from: "A".into(), to: "B".into(), label: None },
-                Edge { from: "A".into(), to: "C".into(), label: None },
-                Edge { from: "B".into(), to: "D".into(), label: None },
-                Edge { from: "C".into(), to: "D".into(), label: None },
+                Edge {
+                    from: "A".into(),
+                    to: "B".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "A".into(),
+                    to: "C".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "B".into(),
+                    to: "D".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "C".into(),
+                    to: "D".into(),
+                    label: None,
+                },
             ],
         };
         let lines = render(&d, &mut ctx(40)).unwrap();

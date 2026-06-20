@@ -4,8 +4,7 @@ use crate::schema::FreeformDiagram;
 
 /// Unescape common escape sequences that arrive as literals from JSON transport.
 fn unescape_ansi(s: &str) -> String {
-    s.replace("\\n", "\n")
-        .replace("\\t", "\t")
+    s.replace("\\n", "\n").replace("\\t", "\t")
 }
 
 /// Render freeform: pad each line to `inner_width`, fixing alignment.
@@ -14,7 +13,10 @@ fn unescape_ansi(s: &str) -> String {
 /// # Errors
 ///
 /// Returns an error if neither `content` nor `lines` is provided, or if content is empty.
-pub(crate) fn render(diagram: &FreeformDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(
+    diagram: &FreeformDiagram,
+    ctx: &mut RenderContext,
+) -> Result<Vec<String>, String> {
     let raw_lines: Vec<String> = if let Some(content) = &diagram.content {
         let unescaped = unescape_ansi(content);
         unescaped.lines().map(String::from).collect()
@@ -29,9 +31,12 @@ pub(crate) fn render(diagram: &FreeformDiagram, ctx: &mut RenderContext) -> Resu
     }
 
     // Check for truncation and warn
-    let has_truncation = raw_lines.iter().any(|l| crate::measure::display_width(l) > ctx.inner_width);
+    let has_truncation = raw_lines
+        .iter()
+        .any(|l| crate::measure::display_width(l) > ctx.inner_width);
     if has_truncation {
-        ctx.warnings.push("some lines truncated to fit width".to_string());
+        ctx.warnings
+            .push("some lines truncated to fit width".to_string());
     }
 
     let out: Vec<String> = raw_lines
@@ -42,8 +47,6 @@ pub(crate) fn render(diagram: &FreeformDiagram, ctx: &mut RenderContext) -> Resu
     Ok(out)
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -52,41 +55,71 @@ mod tests {
     use crate::schema::FreeformDiagram;
 
     fn ctx(width: usize) -> RenderContext {
-        RenderContext { inner_width: width, total_width: u16::try_from(width).unwrap(), warnings: Vec::new() }
+        RenderContext {
+            inner_width: width,
+            total_width: u16::try_from(width).unwrap(),
+            warnings: Vec::new(),
+        }
     }
 
     #[test]
     fn should_pad_all_lines_when_content_provided() {
-        let d = FreeformDiagram { title: None, content: Some("short\nlonger line".into()), lines: None };
+        let d = FreeformDiagram {
+            title: None,
+            content: Some("short\nlonger line".into()),
+            lines: None,
+        };
         let lines = render(&d, &mut ctx(20)).unwrap();
         assert_eq!(lines.len(), 2);
-        for l in &lines { assert_eq!(display_width(l), 20); }
+        for l in &lines {
+            assert_eq!(display_width(l), 20);
+        }
     }
 
     #[test]
     fn should_pad_all_lines_when_lines_field_used() {
-        let d = FreeformDiagram { title: None, content: None, lines: Some(vec!["a".into(), "bb".into()]) };
+        let d = FreeformDiagram {
+            title: None,
+            content: None,
+            lines: Some(vec!["a".into(), "bb".into()]),
+        };
         let lines = render(&d, &mut ctx(10)).unwrap();
         assert_eq!(lines.len(), 2);
-        for l in &lines { assert_eq!(display_width(l), 10); }
+        for l in &lines {
+            assert_eq!(display_width(l), 10);
+        }
     }
 
     #[test]
     fn should_return_error_when_no_content_or_lines() {
-        let d = FreeformDiagram { title: None, content: None, lines: None };
+        let d = FreeformDiagram {
+            title: None,
+            content: None,
+            lines: None,
+        };
         assert!(render(&d, &mut ctx(20)).is_err());
     }
 
     #[test]
     fn should_return_error_when_content_empty() {
-        let d = FreeformDiagram { title: None, content: Some(String::new()), lines: None };
+        let d = FreeformDiagram {
+            title: None,
+            content: Some(String::new()),
+            lines: None,
+        };
         assert!(render(&d, &mut ctx(20)).is_err());
     }
 
     #[test]
     fn should_truncate_when_content_exceeds_width() {
-        let d = FreeformDiagram { title: None, content: Some("x".repeat(50)), lines: None };
+        let d = FreeformDiagram {
+            title: None,
+            content: Some("x".repeat(50)),
+            lines: None,
+        };
         let lines = render(&d, &mut ctx(10)).unwrap();
-        for l in &lines { assert_eq!(display_width(l), 10); }
+        for l in &lines {
+            assert_eq!(display_width(l), 10);
+        }
     }
 }

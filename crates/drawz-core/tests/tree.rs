@@ -3,10 +3,15 @@ use drawz_core::render;
 use drawz_core::schema::*;
 
 fn assert_aligned(result: &drawz_core::RenderResult, _width: u16) {
-    assert!(result.errors.is_empty(), "unexpected errors: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "unexpected errors: {:?}",
+        result.errors
+    );
     let output = result.output.as_ref().expect("expected output");
     for line in output.lines() {
-        let first_w = output.lines().next().map(display_width).unwrap_or(0); assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
+        let first_w = output.lines().next().map(display_width).unwrap_or(0);
+        assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
     }
 }
 
@@ -44,10 +49,17 @@ fn tree_node_alignment() {
         root: Some(TreeNode {
             label: "root".into(),
             children: vec![
-                TreeNode { label: "child1".into(), children: vec![] },
-                TreeNode { label: "child2".into(), children: vec![
-                    TreeNode { label: "grandchild".into(), children: vec![] },
-                ] },
+                TreeNode {
+                    label: "child1".into(),
+                    children: vec![],
+                },
+                TreeNode {
+                    label: "child2".into(),
+                    children: vec![TreeNode {
+                        label: "grandchild".into(),
+                        children: vec![],
+                    }],
+                },
             ],
         }),
         indent: None,
@@ -62,7 +74,11 @@ fn tree_node_alignment() {
 
 #[test]
 fn tree_missing_input_error() {
-    let d = Diagram::Tree(TreeDiagram { title: None, root: None, indent: None });
+    let d = Diagram::Tree(TreeDiagram {
+        title: None,
+        root: None,
+        indent: None,
+    });
     let result = render(&d, 80);
     assert!(!result.errors.is_empty());
 }
@@ -72,7 +88,10 @@ fn tree_indent_renders_connectors() {
     let d = Diagram::Tree(TreeDiagram {
         title: None,
         root: None,
-        indent: Some("project\n  src\n    main.rs\n    lib.rs\n  tests\n    integration.rs\n  Cargo.toml".into()),
+        indent: Some(
+            "project\n  src\n    main.rs\n    lib.rs\n  tests\n    integration.rs\n  Cargo.toml"
+                .into(),
+        ),
     });
     let result = render(&d, 40);
     assert_and_print("Tree: Indent-based", &result, 40);
@@ -96,11 +115,20 @@ fn tree_node_renders_hierarchy() {
                 TreeNode {
                     label: "components".into(),
                     children: vec![
-                        TreeNode { label: "Button.tsx".into(), children: vec![] },
-                        TreeNode { label: "Modal.tsx".into(), children: vec![] },
+                        TreeNode {
+                            label: "Button.tsx".into(),
+                            children: vec![],
+                        },
+                        TreeNode {
+                            label: "Modal.tsx".into(),
+                            children: vec![],
+                        },
                     ],
                 },
-                TreeNode { label: "index.ts".into(), children: vec![] },
+                TreeNode {
+                    label: "index.ts".into(),
+                    children: vec![],
+                },
             ],
         }),
     });
@@ -126,35 +154,53 @@ fn complex_deep_tree() {
                     children: vec![
                         TreeNode {
                             label: "drawz-core".into(),
-                            children: vec![
-                                TreeNode {
-                                    label: "src".into(),
-                                    children: vec![
-                                        TreeNode { label: "lib.rs".into(), children: vec![] },
-                                        TreeNode { label: "render.rs".into(), children: vec![] },
-                                        TreeNode {
-                                            label: "renderers".into(),
-                                            children: vec![
-                                                TreeNode { label: "flow.rs".into(), children: vec![] },
-                                                TreeNode { label: "state.rs".into(), children: vec![] },
-                                                TreeNode { label: "tree.rs".into(), children: vec![] },
-                                            ],
-                                        },
-                                    ],
-                                },
-                            ],
+                            children: vec![TreeNode {
+                                label: "src".into(),
+                                children: vec![
+                                    TreeNode {
+                                        label: "lib.rs".into(),
+                                        children: vec![],
+                                    },
+                                    TreeNode {
+                                        label: "render.rs".into(),
+                                        children: vec![],
+                                    },
+                                    TreeNode {
+                                        label: "renderers".into(),
+                                        children: vec![
+                                            TreeNode {
+                                                label: "flow.rs".into(),
+                                                children: vec![],
+                                            },
+                                            TreeNode {
+                                                label: "state.rs".into(),
+                                                children: vec![],
+                                            },
+                                            TreeNode {
+                                                label: "tree.rs".into(),
+                                                children: vec![],
+                                            },
+                                        ],
+                                    },
+                                ],
+                            }],
                         },
                         TreeNode {
                             label: "drawz-cli".into(),
-                            children: vec![
-                                TreeNode { label: "src".into(), children: vec![
-                                    TreeNode { label: "main.rs".into(), children: vec![] },
-                                ] },
-                            ],
+                            children: vec![TreeNode {
+                                label: "src".into(),
+                                children: vec![TreeNode {
+                                    label: "main.rs".into(),
+                                    children: vec![],
+                                }],
+                            }],
                         },
                     ],
                 },
-                TreeNode { label: "Cargo.toml".into(), children: vec![] },
+                TreeNode {
+                    label: "Cargo.toml".into(),
+                    children: vec![],
+                },
             ],
         }),
     });
