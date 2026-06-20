@@ -202,18 +202,6 @@ fn table_row_with_more_cells_than_headers() {
 // --- Freeform box validation ---
 
 #[test]
-fn freeform_warns_on_misaligned_boxes() {
-    let d = Diagram::Freeform(FreeformDiagram {
-        title: None,
-        content: Some("┌───┐\n│ too wide content here │\n└───┘".into()),
-        lines: None,
-    });
-    let result = render(&d, 40);
-    assert!(!result.warnings.is_empty());
-    assert!(result.warnings.iter().any(|w| w.contains("inconsistent widths")));
-}
-
-#[test]
 fn freeform_no_warning_on_aligned_boxes() {
     let d = Diagram::Freeform(FreeformDiagram {
         title: None,

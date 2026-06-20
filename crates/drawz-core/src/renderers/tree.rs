@@ -48,38 +48,24 @@ fn render_indent(text: &str, ctx: &mut RenderContext) -> Vec<String> {
     };
 
     let mut lines = Vec::new();
-    render_indent_recursive(&entries, 0, entries.len(), "", ctx, &mut lines);
-    lines
-}
+    if !entries.is_empty() {
+        // Root label (no connector)
+        let line = entries[0].1.to_string();
+        lines.push(fit_line(&line, ctx));
 
-fn render_indent_recursive(
-    entries: &[(usize, &str)],
-    start: usize,
-    end: usize,
-    prefix: &str,
-    ctx: &mut RenderContext,
-    out: &mut Vec<String>,
-) {
-    if start >= end {
-        return;
+        // Find span of descendants (everything deeper than root)
+        let base_level = entries[0].0;
+        let desc_end = {
+            let mut i = 1;
+            while i < entries.len() && entries[i].0 > base_level {
+                i += 1;
+            }
+            i
+        };
+
+        render_children_indent(&entries, 1, desc_end, base_level + 1, "", ctx, &mut lines);
     }
-
-    let base_level = entries[start].0;
-
-    // Root of this subtree
-    let line = format!("{prefix}{}", entries[start].1);
-    out.push(fit_line(&line, ctx));
-
-    // Find the span of descendants (everything after root that is deeper)
-    let desc_end = {
-        let mut i = start + 1;
-        while i < end && entries[i].0 > base_level {
-            i += 1;
-        }
-        i
-    };
-
-    render_children_indent(entries, start + 1, desc_end, base_level + 1, prefix, ctx, out);
+    lines
 }
 
 fn render_children_indent(

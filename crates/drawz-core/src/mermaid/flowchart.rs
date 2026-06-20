@@ -14,10 +14,6 @@ pub(super) fn parse_flowchart(code: &str) -> Result<Diagram, String> {
     let mut edges: Vec<Edge> = Vec::new();
 
     for segment in split_statements(body) {
-        let segment = segment.trim();
-        if segment.is_empty() {
-            continue;
-        }
         // Skip subgraph/end directives (not renderable as nodes)
         if segment.starts_with("subgraph") || segment == "end" {
             continue;
@@ -27,17 +23,6 @@ pub(super) fn parse_flowchart(code: &str) -> Result<Diagram, String> {
 
     if nodes.is_empty() && edges.is_empty() {
         return Err("flowchart has no nodes or edges".to_string());
-    }
-
-    if nodes.is_empty() {
-        for e in &edges {
-            if !nodes.iter().any(|n| n.id.as_deref() == Some(&e.from) || n.label == e.from) {
-                nodes.push(Node { id: Some(e.from.clone()), label: e.from.clone() });
-            }
-            if !nodes.iter().any(|n| n.id.as_deref() == Some(&e.to) || n.label == e.to) {
-                nodes.push(Node { id: Some(e.to.clone()), label: e.to.clone() });
-            }
-        }
     }
 
     // Detect branching/merging: if any node has multiple outgoing or incoming edges, use DAG

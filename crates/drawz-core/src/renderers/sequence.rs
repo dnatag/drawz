@@ -17,7 +17,7 @@ pub(crate) fn render(diagram: &SequenceDiagram, ctx: &mut RenderContext) -> Resu
     let num_actors = diagram.actors.len();
     if num_actors == 1 && diagram.messages.is_empty() {
         // Single actor, no messages — just show the actor
-        let lines = vec![fit_line(&diagram.actors[0], ctx)];
+        let lines = vec![pad_right(&diagram.actors[0], ctx.inner_width)];
         return Ok(lines);
     }
 
@@ -232,10 +232,6 @@ fn render_self_return(from: usize, num_actors: usize, col_width: usize, ctx: &mu
     }
     let s: String = row.into_iter().collect();
     pad_right(s.trim_end(), ctx.inner_width)
-}
-
-fn fit_line(line: &str, ctx: &mut RenderContext) -> String {
-    pad_right(line, ctx.inner_width)
 }
 
 #[cfg(test)]

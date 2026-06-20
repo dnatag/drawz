@@ -93,12 +93,7 @@ pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Ve
     Ok(lines)
 }
 
-fn render_level(labels: &[&str], ctx: &mut RenderContext, out: &mut Vec<String>) {
-    if labels.len() == 1 {
-        render_box(labels[0], ctx, out);
-        return;
-    }
-
+fn render_level(labels: &[&str], _ctx: &mut RenderContext, out: &mut Vec<String>) {
     // Render all nodes in one row at natural size — no truncation
     let spacing = 3;
     let widths: Vec<usize> = labels.iter().map(|l| display_width(l) + 4).collect();
@@ -111,14 +106,6 @@ fn render_level(labels: &[&str], ctx: &mut RenderContext, out: &mut Vec<String>)
     out.push(top);
     out.push(mid);
     out.push(bot);
-}
-
-
-fn render_box(label: &str, _ctx: &mut RenderContext, out: &mut Vec<String>) {
-    let box_w = display_width(label) + 4;
-    out.push(format!("┌{}┐", "─".repeat(box_w - 2)));
-    out.push(format!("│ {label} │"));
-    out.push(format!("└{}┘", "─".repeat(box_w - 2)));
 }
 
 fn get_label<'a>(id: &'a str, diagram: &'a DagDiagram) -> &'a str {

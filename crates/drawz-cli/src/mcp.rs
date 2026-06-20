@@ -83,22 +83,6 @@ impl ServerHandler for DrawzHandler {
 fn call_render(args: Option<serde_json::Map<String, Value>>, session_width: &AtomicU16) -> CallToolResult {
     let args = Value::Object(args.unwrap_or_default());
 
-    // Guard against excessively large inputs (>1MB JSON)
-    let args_str = args.to_string();
-    if args_str.len() > 1_048_576 {
-        let resp = RenderResponse {
-            output: None,
-            fit: false,
-            rendered_width: 0,
-            errors: vec!["input too large (>1MB)".to_string()],
-            warnings: vec![],
-            layout_note: None,
-        };
-        let mut result = CallToolResult::text_content(vec![to_json(&resp).into()]);
-        result.is_error = Some(true);
-        return result;
-    }
-
     let input: DiagramInput = match serde_json::from_value(args.clone()) {
         Ok(d) => d,
         Err(e) => {
@@ -108,7 +92,6 @@ fn call_render(args: Option<serde_json::Map<String, Value>>, session_width: &Ato
                 rendered_width: 0,
                 errors: vec![format!("invalid input: {e}")],
                 warnings: vec![],
-                layout_note: None,
             };
             let mut result = CallToolResult::text_content(vec![
                 to_json(&resp).into(),
@@ -143,7 +126,6 @@ fn call_render(args: Option<serde_json::Map<String, Value>>, session_width: &Ato
             .unwrap_or(0),
         errors: result.errors,
         warnings: result.warnings,
-        layout_note: None,
     };
     let mut call_result = CallToolResult::text_content(vec![to_json(&resp).into()]);
     if has_errors {
@@ -211,8 +193,6 @@ struct RenderResponse {
     rendered_width: usize,
     errors: Vec<String>,
     warnings: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    layout_note: Option<String>,
 }
 
 /// Serialize to JSON string. Cannot fail for our response types (String/Vec/bool fields).
