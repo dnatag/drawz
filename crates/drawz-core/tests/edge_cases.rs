@@ -419,7 +419,10 @@ fn subflow_frame_hugs_content_not_outer_width() {
     // The dashed sub-flow border should be much narrower than 120
     let dashed_line = output.lines().find(|l| l.contains('╌')).unwrap();
     let dashed_w = display_width(dashed_line.trim_end());
-    assert!(dashed_w < 50, "sub-flow frame should hug content: got {dashed_w}");
+    assert!(
+        dashed_w < 50,
+        "sub-flow frame should hug content: got {dashed_w}"
+    );
 }
 
 #[test]
@@ -436,6 +439,9 @@ fn wide_content_still_drives_frame_beyond_minimum() {
     let result = render(&d, 120);
     let output = result.output.unwrap();
     let w = display_width(output.lines().next().unwrap());
-    assert!(w > 40, "wide content should push frame beyond minimum: got {w}");
+    assert!(
+        w > 40,
+        "wide content should push frame beyond minimum: got {w}"
+    );
     assert!(w < 120, "should still shrink from requested 120: got {w}");
 }

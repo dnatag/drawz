@@ -121,7 +121,8 @@ fn render_steps(
                     let sub_lines = sub_result?;
 
                     // Size frame to actual content, not max available width
-                    let content_w = sub_lines.iter()
+                    let content_w = sub_lines
+                        .iter()
                         .map(|l| display_width(l.trim_end()))
                         .max()
                         .unwrap_or(0);
