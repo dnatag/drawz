@@ -6,12 +6,20 @@ The rendering guarantee layer between AI agents and terminal display. Agents des
 
 AI agents produce misaligned ASCII diagrams because they can't compute Unicode character widths reliably. drawz separates content (what to show) from rendering (how it looks) — the same way Mermaid works for browsers, but for terminals.
 
+## Install
+
+```sh
+# From source
+cargo install --path crates/drawz-cli
+
+# Homebrew (macOS/Linux)
+brew tap dnatag/tap
+brew install drawz
+```
+
 ## Quick Start
 
 ```sh
-# Install
-cargo install --path crates/drawz-cli
-
 # Horizontal flow
 echo '{"type":"flow","direction":"LR","steps":["Build","Test","Deploy"]}' | drawz
 
@@ -21,13 +29,13 @@ echo '{"type":"table","headers":["Feature","Status"],"rows":[["Alignment","✓"]
 # Tree (auto-detects 2-space or 4-space indent)
 echo '{"type":"tree","indent":"src\n  main.rs\n  lib.rs\n  utils/\n    helpers.rs"}' | drawz
 
-# DAG with Sugiyama layout (diamond, fan-out)
+# DAG with Sugiyama layout
 echo '{"type":"dag","edges":[{"from":"Parse","to":"Lint"},{"from":"Parse","to":"Compile"},{"from":"Lint","to":"Link"},{"from":"Compile","to":"Link"}]}' | drawz
 
 # Sequence diagram
 echo '{"type":"sequence","actors":["Client","Server"],"messages":[{"from":"Client","to":"Server","label":"GET /api"}]}' | drawz
 
-# Mermaid (LR = horizontal, TD = vertical, branching = DAG)
+# Mermaid passthrough
 echo '{"type":"mermaid","code":"graph LR; A[Parse]-->B[Layout]-->C[Render]-->D[Output]"}' | drawz
 
 # MCP server mode
@@ -56,7 +64,22 @@ CLI pipe: echo '...' | drawz — stdin JSON → stdout diagram
 Library:  drawz_core::render(&diagram, width) → RenderResult
 ```
 
-## CLI Usage
+### MCP Setup
+
+Add to your MCP client configuration (Claude Desktop, Kiro, Cursor, etc.):
+
+```json
+{
+  "mcpServers": {
+    "drawz": {
+      "command": "drawz",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+### CLI Usage
 
 ```
 Usage: drawz [OPTIONS] [COMMAND]
@@ -79,9 +102,11 @@ All render calls return:
 {
   "output": "<rendered diagram or null>",
   "fit": true,
+  "rendered_width": 120,
   "errors": [],
   "warnings": []
 }
+```
 
 - `fit: false` + warnings when content is truncated to fit width
 - `output: null` + errors when input is invalid
@@ -90,7 +115,7 @@ All render calls return:
 
 The `render_diagram` tool description teaches agents when and how to call drawz automatically via MCP. No system prompt changes are required for basic usage.
 
-To make agents **prefer diagrams over prose**, add these lines to your `AGENTS.md` or `CLAUDE.md`:
+To make agents **prefer diagrams over prose**, add to your `AGENTS.md` or `CLAUDE.md`:
 
 ```
 - Use render_diagram for all visual output — tables, trees, flows, sequences, state machines, DAGs, freeform, and mermaid. Never hand-draw them.
@@ -100,39 +125,11 @@ To make agents **prefer diagrams over prose**, add these lines to your `AGENTS.m
 - Always display the rendered output in a code block — tool results may not be visible to the user automatically.
 ```
 
-### Installation
-
-```sh
-cargo install --path crates/drawz-cli
-```
-
-### MCP Setup
-
-Add to your MCP client configuration (e.g., Claude Desktop, Kiro, Cursor):
-
-```json
-{
-  "mcpServers": {
-    "drawz": {
-      "command": "drawz",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-### CLI Pipe Usage
-
-```sh
-echo '{"type":"flow","direction":"LR","steps":["Build","Test","Deploy"]}' | drawz
-echo '{"type":"table","headers":["A","B"],"rows":[["1","2"]]}' | drawz -w 60
-```
-
 ## Building
 
 ```sh
 cargo build --release
-cargo test              # all tests
+cargo test              # 248 tests
 cargo clippy --all-targets -- -D warnings
 ```
 
@@ -153,5 +150,4 @@ Achieved by: measure.rs (display_width) → pad_right → frame_box
 
 ## Status
 
-196 tests, clippy clean, all diagram types rendering correctly.
-```
+248 tests, clippy clean, all diagram types rendering correctly.

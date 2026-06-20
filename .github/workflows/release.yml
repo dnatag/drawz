@@ -89,34 +89,33 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: dnatag/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
-
-      - name: Get version
-        id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
-
-      - name: Compute SHA256
-        id: sha
+      - name: Update formula
         run: |
-          echo "mac_arm=$(sha256sum artifacts/drawz-aarch64-apple-darwin.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
-          echo "mac_intel=$(sha256sum artifacts/drawz-x86_64-apple-darwin.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
-          echo "linux_arm=$(sha256sum artifacts/drawz-aarch64-unknown-linux-gnu.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
-          echo "linux_intel=$(sha256sum artifacts/drawz-x86_64-unknown-linux-gnu.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA_AARCH64_DARWIN=$(sha256sum artifacts/drawz-aarch64-apple-darwin.tar.gz | cut -d' ' -f1)
+          SHA_X86_64_DARWIN=$(sha256sum artifacts/drawz-x86_64-apple-darwin.tar.gz | cut -d' ' -f1)
+          SHA_AARCH64_LINUX=$(sha256sum artifacts/drawz-aarch64-unknown-linux-gnu.tar.gz | cut -d' ' -f1)
+          SHA_X86_64_LINUX=$(sha256sum artifacts/drawz-x86_64-unknown-linux-gnu.tar.gz | cut -d' ' -f1)
 
-      - name: Update Homebrew tap
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          repository: ${{ github.repository_owner }}/homebrew-tap
-          event-type: update-formula
-          client-payload: |
-            {
-              "version": "${{ steps.version.outputs.version }}",
-              "mac_arm_sha": "${{ steps.sha.outputs.mac_arm }}",
-              "mac_intel_sha": "${{ steps.sha.outputs.mac_intel }}",
-              "linux_arm_sha": "${{ steps.sha.outputs.linux_arm }}",
-              "linux_intel_sha": "${{ steps.sha.outputs.linux_intel }}"
-            }
+          sed -i "s/version \".*\"/version \"${VERSION}\"/" Formula/drawz.rb
+
+          awk -v s1="$SHA_AARCH64_DARWIN" -v s2="$SHA_X86_64_DARWIN" \
+              -v s3="$SHA_AARCH64_LINUX"  -v s4="$SHA_X86_64_LINUX" '
+            /sha256/ { n++; sub(/"[^"]*"$/, "\"" (n==1?s1:n==2?s2:n==3?s3:s4) "\"") }
+            { print }
+          ' Formula/drawz.rb > Formula/drawz.rb.tmp && mv Formula/drawz.rb.tmp Formula/drawz.rb
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/drawz.rb
+          git commit -m "drawz ${GITHUB_REF_NAME}"
+          git push
