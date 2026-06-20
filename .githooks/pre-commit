@@ -1,0 +1,19 @@
+#!/bin/sh
+# Pre-commit hook: fmt + clippy + test must pass before commit.
+
+set -e
+
+cargo fmt --all -- --check 2>/dev/null || {
+    echo "pre-commit: cargo fmt failed. Run 'cargo fmt --all' and re-commit."
+    exit 1
+}
+
+cargo clippy --all-targets -- -D warnings 2>/dev/null || {
+    echo "pre-commit: clippy warnings found. Fix them and re-commit."
+    exit 1
+}
+
+cargo test --quiet 2>/dev/null || {
+    echo "pre-commit: tests failed. Fix them and re-commit."
+    exit 1
+}
