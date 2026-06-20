@@ -101,9 +101,19 @@ pub fn render(diagram: &Diagram, width: u16) -> RenderResult {
                     (aligned, final_width)
                 }
             } else {
-                // Content fits — use requested width (original behavior)
+                // Content fits — shrink frame to actual content width (min 40 cols)
                 if framed {
-                    (frame::frame_box(&lines, title, width), width as usize)
+                    let title_width = title
+                        .map(|t| crate::measure::display_width(t) + 4)
+                        .unwrap_or(0);
+                    let min_inner = 36usize.min(inner_width); // 40 total min, but don't exceed requested
+                    let actual_w = max_line_w.max(title_width).max(min_inner);
+                    let aligned: Vec<String> = lines
+                        .iter()
+                        .map(|l| crate::measure::pad_right(l.trim_end(), actual_w))
+                        .collect();
+                    let fw = (actual_w + 4).min(65535) as u16;
+                    (frame::frame_box(&aligned, title, fw), actual_w + 4)
                 } else {
                     (lines, inner_width)
                 }

@@ -46,6 +46,7 @@ drawz-cli/            Single binary: pipe mode + MCP server
 - **Deterministic.** Same input + same width = same output, always.
 - **Minimum width = 4.** Rejected at top of `render()`.
 - **fit: false when truncated.** All renderers push warnings and set fit=false when content is truncated.
+- **Always run tests for code changes.** Run `cargo test` before considering any code change complete. No exceptions.
 
 ## COMM Style
 

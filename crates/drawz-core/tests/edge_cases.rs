@@ -346,3 +346,96 @@ fn sequence_narrow_width_does_not_panic() {
     // Should render (maybe with truncation) or error, but not panic
     assert!(result.output.is_some() || !result.errors.is_empty());
 }
+
+// --- Frame shrinks to content ---
+
+#[test]
+fn outer_frame_shrinks_to_content_not_requested_width() {
+    // A short flow at width 120 should NOT produce 120-col output
+    let d = Diagram::Flow(FlowDiagram {
+        title: None,
+        direction: None,
+        steps: Some(vec![
+            FlowStep::Label("A".into()),
+            FlowStep::Label("B".into()),
+        ]),
+        nodes: None,
+        edges: None,
+    });
+    let result = render(&d, 120);
+    let output = result.output.unwrap();
+    let w = display_width(output.lines().next().unwrap());
+    assert!(w < 120, "frame should shrink: got {w}");
+    assert!(w >= 40, "frame should respect 40-col minimum: got {w}");
+    // All lines same width (alignment invariant)
+    for line in output.lines() {
+        assert_eq!(display_width(line), w, "misaligned: {line:?}");
+    }
+}
+
+#[test]
+fn outer_frame_respects_40_col_minimum() {
+    // Very short content should still get 40-col frame
+    let d = Diagram::Freeform(FreeformDiagram {
+        title: None,
+        content: Some("hi".into()),
+        lines: None,
+    });
+    let result = render(&d, 120);
+    let output = result.output.unwrap();
+    let w = display_width(output.lines().next().unwrap());
+    assert_eq!(w, 40, "expected 40-col minimum frame, got {w}");
+}
+
+#[test]
+fn outer_frame_does_not_exceed_requested_width() {
+    let d = Diagram::Flow(FlowDiagram {
+        title: None,
+        direction: None,
+        steps: Some(vec![FlowStep::Label("short".into())]),
+        nodes: None,
+        edges: None,
+    });
+    let result = render(&d, 30);
+    let output = result.output.unwrap();
+    let w = display_width(output.lines().next().unwrap());
+    assert!(w <= 30, "should not exceed requested width: got {w}");
+}
+
+#[test]
+fn subflow_frame_hugs_content_not_outer_width() {
+    let d = Diagram::Flow(FlowDiagram {
+        title: None,
+        direction: None,
+        steps: Some(vec![FlowStep::Sub(SubFlow {
+            label: "Parent".into(),
+            steps: vec![FlowStep::Label("x".into())],
+        })]),
+        nodes: None,
+        edges: None,
+    });
+    let result = render(&d, 120);
+    let output = result.output.unwrap();
+    // The dashed sub-flow border should be much narrower than 120
+    let dashed_line = output.lines().find(|l| l.contains('╌')).unwrap();
+    let dashed_w = display_width(dashed_line.trim_end());
+    assert!(dashed_w < 50, "sub-flow frame should hug content: got {dashed_w}");
+}
+
+#[test]
+fn wide_content_still_drives_frame_beyond_minimum() {
+    // Content wider than 40 cols should drive the frame size
+    let long_label = "this is a label that exceeds forty columns easily";
+    let d = Diagram::Flow(FlowDiagram {
+        title: None,
+        direction: None,
+        steps: Some(vec![FlowStep::Label(long_label.into())]),
+        nodes: None,
+        edges: None,
+    });
+    let result = render(&d, 120);
+    let output = result.output.unwrap();
+    let w = display_width(output.lines().next().unwrap());
+    assert!(w > 40, "wide content should push frame beyond minimum: got {w}");
+    assert!(w < 120, "should still shrink from requested 120: got {w}");
+}

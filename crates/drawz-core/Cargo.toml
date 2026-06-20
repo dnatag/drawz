@@ -1,6 +1,6 @@
 [package]
 name = "drawz-core"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "Semantic diagram renderer for agent-to-human communication in terminals"
 

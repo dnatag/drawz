@@ -59,8 +59,10 @@ fn freeform_single_line_alignment() {
     let result = render(&d, 20);
     assert!(result.errors.is_empty());
     let output = result.output.unwrap();
+    let expected_w = display_width(output.lines().next().unwrap());
+    assert!(expected_w <= 20);
     for line in output.lines() {
-        assert_eq!(display_width(line), 20, "misaligned: {line:?}");
+        assert_eq!(display_width(line), expected_w, "misaligned: {line:?}");
     }
 }
 
@@ -74,8 +76,10 @@ fn freeform_unicode_content_alignment() {
     let result = render(&d, 30);
     assert!(result.errors.is_empty());
     let output = result.output.unwrap();
+    let expected_w = display_width(output.lines().next().unwrap());
+    assert!(expected_w <= 30);
     for line in output.lines() {
-        assert_eq!(display_width(line), 30, "misaligned: {line:?}");
+        assert_eq!(display_width(line), expected_w, "misaligned: {line:?}");
     }
 }
 
@@ -89,8 +93,10 @@ fn freeform_with_title_alignment() {
     let result = render(&d, 40);
     assert!(result.errors.is_empty());
     let output = result.output.unwrap();
+    let expected_w = display_width(output.lines().next().unwrap());
+    assert!(expected_w <= 40);
     for line in output.lines() {
-        assert_eq!(display_width(line), 40, "misaligned: {line:?}");
+        assert_eq!(display_width(line), expected_w, "misaligned: {line:?}");
     }
 }
 
@@ -104,8 +110,10 @@ fn freeform_lines_field() {
     let result = render(&d, 30);
     assert!(result.errors.is_empty());
     let output = result.output.unwrap();
+    let expected_w = display_width(output.lines().next().unwrap());
+    assert!(expected_w <= 30);
     for line in output.lines() {
-        assert_eq!(display_width(line), 30, "misaligned: {line:?}");
+        assert_eq!(display_width(line), expected_w, "misaligned: {line:?}");
     }
 }
 

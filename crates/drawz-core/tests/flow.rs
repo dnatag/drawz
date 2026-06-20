@@ -70,8 +70,10 @@ fn flow_nested_subflow_alignment() {
     let result = render(&d, 40);
     assert!(result.errors.is_empty());
     let output = result.output.unwrap();
+    let expected_w = display_width(output.lines().next().unwrap());
+    assert!(expected_w <= 40, "exceeds max width: {expected_w}");
     for line in output.lines() {
-        assert_eq!(display_width(line), 40, "misaligned: {line:?}");
+        assert_eq!(display_width(line), expected_w, "misaligned: {line:?}");
     }
 }
 

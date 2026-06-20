@@ -109,17 +109,23 @@ fn render_steps(
                     let arrow = format!("{prefix}  │");
                     lines.push(fit_line(&arrow, ctx));
 
-                    // Frame geometry: prefix + "╎" + " " + content + " " + "╎"
                     let frame_prefix = format!("{prefix}  ");
                     let fp_w = display_width(&frame_prefix);
-                    let frame_inner = ctx.inner_width.saturating_sub(fp_w + 4); // 4 for ╎ + space + content + space + ╎
+                    let frame_max = ctx.inner_width.saturating_sub(fp_w + 4); // 4 for ╎ + space + space + ╎
 
                     // Render sub-steps with reduced inner_width
                     let saved_inner = ctx.inner_width;
-                    ctx.inner_width = frame_inner;
+                    ctx.inner_width = frame_max;
                     let sub_result = render_steps(&sub.steps, ctx, 0);
                     ctx.inner_width = saved_inner;
                     let sub_lines = sub_result?;
+
+                    // Size frame to actual content, not max available width
+                    let content_w = sub_lines.iter()
+                        .map(|l| display_width(l.trim_end()))
+                        .max()
+                        .unwrap_or(0);
+                    let frame_inner = content_w.min(frame_max);
 
                     // Top border
                     let border_w = frame_inner + 2; // inner + 2 spaces
