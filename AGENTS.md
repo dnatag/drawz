@@ -47,6 +47,7 @@ drawz-cli/            Single binary: pipe mode + MCP server
 - **Minimum width = 4.** Rejected at top of `render()`.
 - **fit: false when truncated.** All renderers push warnings and set fit=false when content is truncated.
 - **Always run tests for code changes.** Run `cargo test` before considering any code change complete. No exceptions.
+- **Do what is right, not what is easy.** When implementing a feature, build the version that actually solves the user's problem. A simpler version that forces users back to hand-drawing has failed its purpose. Complexity in implementation is acceptable; complexity in output is not.
 
 ## COMM Style
 
