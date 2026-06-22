@@ -137,3 +137,118 @@ fn complex_state_machine() {
     assert!(output.contains("ESTABLISHED"));
     assert!(output.contains("connect()"));
 }
+
+#[test]
+fn state_branch_renders_horizontally() {
+    let d = Diagram::State(StateDiagram {
+        title: Some("Error Handling".into()),
+        states: None,
+        transitions: vec![
+            Edge {
+                from: "Idle".into(),
+                to: "Running".into(),
+                label: Some("start".into()),
+            },
+            Edge {
+                from: "Running".into(),
+                to: "Done".into(),
+                label: Some("complete".into()),
+            },
+            Edge {
+                from: "Running".into(),
+                to: "Failed".into(),
+                label: Some("error".into()),
+            },
+            Edge {
+                from: "Failed".into(),
+                to: "Idle".into(),
+                label: Some("retry".into()),
+            },
+        ],
+    });
+    let result = render(&d, 50);
+    assert_and_print(
+        "State: Branching (Running → Failed horizontal)",
+        &result,
+        50,
+    );
+    let output = result.output.unwrap();
+    // Branch target should be on same line as source
+    assert!(
+        output
+            .lines()
+            .any(|l| l.contains("Running") && l.contains("Failed")),
+        "Running→Failed should render horizontally"
+    );
+    assert!(output.contains("error"), "branch label should appear");
+}
+
+#[test]
+fn state_self_loop_renders() {
+    let d = Diagram::State(StateDiagram {
+        title: None,
+        states: None,
+        transitions: vec![
+            Edge {
+                from: "Retry".into(),
+                to: "Retry".into(),
+                label: Some("again".into()),
+            },
+            Edge {
+                from: "Retry".into(),
+                to: "Done".into(),
+                label: Some("success".into()),
+            },
+        ],
+    });
+    let result = render(&d, 40);
+    assert_and_print("State: Self-loop", &result, 40);
+    let output = result.output.unwrap();
+    assert!(output.contains("↺"), "self-loop should show ↺ symbol");
+    assert!(output.contains("again"), "self-loop label should appear");
+}
+
+#[test]
+fn state_multiple_branches_from_one_state() {
+    let d = Diagram::State(StateDiagram {
+        title: Some("Jira Workflow".into()),
+        states: None,
+        transitions: vec![
+            Edge {
+                from: "Open".into(),
+                to: "InProgress".into(),
+                label: Some("assign".into()),
+            },
+            Edge {
+                from: "InProgress".into(),
+                to: "Done".into(),
+                label: Some("resolve".into()),
+            },
+            Edge {
+                from: "InProgress".into(),
+                to: "Blocked".into(),
+                label: Some("block".into()),
+            },
+            Edge {
+                from: "InProgress".into(),
+                to: "Cancelled".into(),
+                label: Some("cancel".into()),
+            },
+        ],
+    });
+    let result = render(&d, 60);
+    assert_and_print("State: Multiple branches from InProgress", &result, 60);
+    let output = result.output.unwrap();
+    // First branch should be horizontal
+    assert!(
+        output
+            .lines()
+            .any(|l| l.contains("InProgress") && l.contains("Blocked")),
+        "first branch should be horizontal"
+    );
+    // Additional branches should appear as text annotations
+    assert!(
+        output.contains("cancel") && output.contains("Cancelled"),
+        "second branch should appear as text"
+    );
+}
