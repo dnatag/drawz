@@ -106,6 +106,7 @@ fn dag_nodes_as_strings() {
             to: "Beta".into(),
             label: None,
         }],
+        subgraphs: None,
     });
     let result = render(&d, 40);
     assert_aligned(&result, 40);
@@ -261,6 +262,7 @@ fn dag_fan_out_parallel_nodes() {
                 label: None,
             },
         ],
+        subgraphs: None,
     });
     let result = render(&d, 40);
     assert_aligned(&result, 40);
@@ -304,6 +306,7 @@ fn all_types_at_width_5() {
                     to: "B".into(),
                     label: None,
                 }],
+                subgraphs: None,
             }),
         ),
         (

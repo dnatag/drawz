@@ -71,6 +71,7 @@ fn dag_renders_layered_dependencies() {
                 label: None,
             },
         ],
+        subgraphs: None,
     });
     let result = render(&d, 40);
     assert_and_print("DAG: Build Graph", &result, 40);
@@ -102,6 +103,7 @@ fn dag_cycle_handling() {
                 label: None,
             },
         ],
+        subgraphs: None,
     });
     let result = render(&d, 30);
     assert!(result.output.is_none());
@@ -126,6 +128,7 @@ fn dag_parallel_nodes_in_layer() {
                 label: None,
             },
         ],
+        subgraphs: None,
     });
     let result = render(&d, 40);
     assert_aligned(&result, 40);
@@ -160,6 +163,7 @@ fn dag_many_parallel_nodes_narrow_width() {
                 label: None,
             },
         ],
+        subgraphs: None,
     });
     let result = render(&d, 20);
     assert_aligned(&result, 20);
@@ -174,6 +178,7 @@ fn dag_single_node_no_edges() {
             label: "Standalone".into(),
         }]),
         edges: vec![],
+        subgraphs: None,
     });
     let result = render(&d, 30);
     assert_aligned(&result, 30);
@@ -200,6 +205,7 @@ fn dag_long_node_label_truncated() {
             to: "b".into(),
             label: None,
         }],
+        subgraphs: None,
     });
     let result = render(&d, 20);
     assert_aligned(&result, 20);
@@ -232,6 +238,7 @@ fn dag_diamond_dependency() {
                 label: None,
             },
         ],
+        subgraphs: None,
     });
     let result = render(&d, 40);
     assert_aligned(&result, 40);
@@ -257,6 +264,7 @@ fn dag_edge_labels() {
                 label: Some("triggers".into()),
             },
         ],
+        subgraphs: None,
     });
     let result = render(&d, 40);
     assert_aligned(&result, 40);
@@ -272,6 +280,7 @@ fn dag_title_rendering() {
             to: "Deploy".into(),
             label: None,
         }],
+        subgraphs: None,
     });
     let result = render(&d, 40);
     assert_aligned(&result, 40);
@@ -289,6 +298,7 @@ fn dag_self_referencing_edge() {
             to: "A".into(),
             label: None,
         }],
+        subgraphs: None,
     });
     let result = render(&d, 30);
     assert!(result.output.is_some() || !result.errors.is_empty());
@@ -311,6 +321,7 @@ fn dag_duplicate_edges() {
                 label: None,
             },
         ],
+        subgraphs: None,
     });
     let result = render(&d, 30);
     assert!(result.output.is_some() || !result.errors.is_empty());
@@ -326,6 +337,7 @@ fn dag_minimum_width() {
             to: "B".into(),
             label: None,
         }],
+        subgraphs: None,
     });
     let result = render(&d, 4);
     assert!(result.output.is_some() || !result.errors.is_empty());

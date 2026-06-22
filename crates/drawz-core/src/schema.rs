@@ -121,6 +121,15 @@ pub struct DagDiagram {
     #[serde(default, deserialize_with = "deserialize_nodes")]
     pub nodes: Option<Vec<Node>>,
     pub edges: Vec<Edge>,
+    /// Named clusters grouping nodes visually.
+    pub subgraphs: Option<Vec<Subgraph>>,
+}
+
+/// A named group of nodes rendered as a framed cluster.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Subgraph {
+    pub label: String,
+    pub node_ids: Vec<String>,
 }
 
 /// Freeform text block.

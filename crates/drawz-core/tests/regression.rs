@@ -186,6 +186,7 @@ fn dag_single_node_no_edges() {
             label: "Alone".into(),
         }]),
         edges: vec![],
+        subgraphs: None,
     });
     // Should not error — single node is valid
     let result = render(&d, 30);
@@ -210,6 +211,7 @@ fn dag_disconnected_components() {
                 label: None,
             },
         ],
+        subgraphs: None,
     });
     let result = render(&d, 50);
     assert_aligned(&result);
@@ -231,6 +233,7 @@ fn dag_long_chain_10_nodes() {
         title: None,
         nodes: None,
         edges,
+        subgraphs: None,
     });
     let result = render(&d, 30);
     assert_aligned(&result);

@@ -287,3 +287,75 @@ fn mermaid_flowchart_keyword_variants() {
         assert_aligned(&result, 30);
     }
 }
+
+// --- Mermaid subgraph integration tests ---
+
+#[test]
+fn mermaid_subgraph_renders_labeled_frames() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "flowchart TD\n  subgraph Frontend\n    A[App]-->B[Client]\n  end\n  subgraph Backend\n    C[API]-->D[DB]\n  end\n  B-->C".into(),
+    });
+    let result = render(&d, 60);
+    assert_and_print("Mermaid: Subgraph (Frontend + Backend)", &result, 60);
+    let output = result.output.unwrap();
+    assert!(
+        output.contains("Frontend"),
+        "should have Frontend frame label"
+    );
+    assert!(
+        output.contains("Backend"),
+        "should have Backend frame label"
+    );
+    assert!(output.contains("App"), "should render Frontend nodes");
+    assert!(output.contains("DB"), "should render Backend nodes");
+}
+
+#[test]
+fn mermaid_subgraph_inter_group_arrows_outside_frames() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "flowchart TD\n  subgraph G1\n    A-->B\n  end\n  subgraph G2\n    C-->D\n  end\n  B-->C".into(),
+    });
+    let result = render(&d, 60);
+    assert_and_print("Mermaid: Subgraph inter-group arrows", &result, 60);
+    let output = result.output.unwrap();
+    let lines: Vec<&str> = output.lines().collect();
+    let g1_end = lines
+        .iter()
+        .position(|l| l.contains('┘') && !l.contains("G2"))
+        .unwrap();
+    let g2_start = lines.iter().position(|l| l.contains("G2")).unwrap();
+    let between = &lines[g1_end + 1..g2_start];
+    assert!(
+        between.iter().any(|l| l.contains('▼')),
+        "should have arrow between subgraph frames"
+    );
+}
+
+#[test]
+fn mermaid_subgraph_single_group_frames_correctly() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "flowchart TD\n  subgraph Services\n    A-->B-->C\n  end".into(),
+    });
+    let result = render(&d, 40);
+    assert_and_print("Mermaid: Single subgraph", &result, 40);
+    let output = result.output.unwrap();
+    assert!(output.contains("Services"), "should have frame label");
+    assert!(output.contains("┌─"), "should have top border");
+    assert!(output.contains("└─"), "should have bottom border");
+}
+
+#[test]
+fn mermaid_subgraph_nodes_not_rendered_as_extra_boxes() {
+    let d = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "flowchart TD\n  subgraph Group\n    X-->Y\n  end\n  Y-->Z".into(),
+    });
+    let result = render(&d, 40);
+    assert_and_print("Mermaid: Subgraph label not a node", &result, 40);
+    let output = result.output.unwrap();
+    let group_as_box = output.contains("│ Group │");
+    assert!(!group_as_box, "subgraph label should not be a node box");
+}

@@ -96,11 +96,14 @@ pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Ve
 
     // Render
     let mut lines = Vec::new();
+    let mut level_line_starts: Vec<usize> = Vec::new(); // output line index where each level starts
+
     for (level_idx, level) in levels.iter().enumerate() {
         if level.is_empty() {
             continue;
         }
 
+        level_line_starts.push(lines.len());
         render_level(level, offsets[level_idx], &mut lines);
 
         if level_idx >= level_count - 1 {
@@ -142,6 +145,22 @@ pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Ve
 
     if lines.is_empty() {
         return Err("dag has no renderable content".to_string());
+    }
+
+    // Post-process: wrap subgraph regions with labeled frames
+    if let Some(subgraphs) = &diagram.subgraphs {
+        let id_to_label: HashMap<&str, &str> = node_ids
+            .iter()
+            .zip(nodes_with_ids.iter())
+            .map(|(&id, &(_, lbl))| (id, lbl))
+            .collect();
+        lines = frame_subgraphs(
+            &lines,
+            subgraphs,
+            &label_pos,
+            &level_line_starts,
+            &id_to_label,
+        );
     }
 
     Ok(lines)
@@ -232,10 +251,10 @@ fn render_arrows(
     let src_xs = sorted_unique(edges.iter().map(|&(s, _)| src_centers[s]));
     let dst_xs = sorted_unique(edges.iter().map(|&(_, d)| dst_centers[d]));
 
-    // Straight-down case: sources and destinations align perfectly
-    if src_xs == dst_xs {
+    // Straight-down case: sources and destinations align, or single 1:1 connection
+    if src_xs == dst_xs || (src_xs.len() == 1 && dst_xs.len() == 1) {
         out.push(multi_char_row(&src_xs, '│', width));
-        out.push(multi_char_row(&dst_xs, '▼', width));
+        out.push(multi_char_row(&src_xs, '▼', width)); // arrow at source center
         return;
     }
 
@@ -311,6 +330,127 @@ fn get_label<'a>(id: &'a str, diagram: &'a DagDiagram) -> &'a str {
         .map_or(id, |n| &n.label)
 }
 
+/// Output lines per level (top border + label + bottom border of box).
+const LINES_PER_LEVEL: usize = 3;
+
+/// A resolved subgraph's position in the rendered output.
+struct SubgraphRegion<'a> {
+    start_line: usize,
+    end_line: usize,
+    label: &'a str,
+}
+
+/// Wrap contiguous level regions belonging to subgraphs with labeled borders.
+fn frame_subgraphs(
+    lines: &[String],
+    subgraphs: &[crate::schema::Subgraph],
+    label_pos: &HashMap<&str, (usize, usize)>,
+    level_line_starts: &[usize],
+    id_to_label: &HashMap<&str, &str>,
+) -> Vec<String> {
+    let regions = resolve_subgraph_regions(
+        subgraphs,
+        label_pos,
+        level_line_starts,
+        id_to_label,
+        lines.len(),
+    );
+    if regions.is_empty() {
+        return lines.to_vec();
+    }
+
+    let mut result = Vec::with_capacity(lines.len() + regions.len() * 2);
+    let mut cursor = 0;
+
+    for region in &regions {
+        if region.start_line < cursor {
+            continue; // overlapping region, skip
+        }
+
+        // Emit unframed lines before this region
+        result.extend_from_slice(&lines[cursor..region.start_line]);
+
+        // Frame the region
+        let content = &lines[region.start_line..region.end_line];
+        frame_region(region.label, content, &mut result);
+
+        cursor = region.end_line;
+    }
+
+    // Emit remaining lines after last region
+    result.extend_from_slice(&lines[cursor..]);
+    result
+}
+
+/// Resolve which output line ranges each subgraph occupies.
+fn resolve_subgraph_regions<'a>(
+    subgraphs: &'a [crate::schema::Subgraph],
+    label_pos: &HashMap<&str, (usize, usize)>,
+    level_line_starts: &[usize],
+    id_to_label: &HashMap<&str, &str>,
+    total_lines: usize,
+) -> Vec<SubgraphRegion<'a>> {
+    let mut regions: Vec<SubgraphRegion<'a>> = subgraphs
+        .iter()
+        .filter_map(|sg| {
+            let (min_level, max_level) =
+                sg.node_ids
+                    .iter()
+                    .fold((usize::MAX, 0usize), |(min, max), node_id| {
+                        let label = id_to_label
+                            .get(node_id.as_str())
+                            .copied()
+                            .unwrap_or(node_id.as_str());
+                        label_pos
+                            .get(label)
+                            .map_or((min, max), |&(level, _)| (min.min(level), max.max(level)))
+                    });
+            if min_level == usize::MAX {
+                return None;
+            }
+
+            let start_line = *level_line_starts.get(min_level)?;
+            let end_line = level_line_starts
+                .get(max_level)
+                .map(|&s| s + LINES_PER_LEVEL)
+                .unwrap_or(total_lines);
+
+            Some(SubgraphRegion {
+                start_line,
+                end_line,
+                label: &sg.label,
+            })
+        })
+        .collect();
+
+    regions.sort_by_key(|r| r.start_line);
+    regions
+}
+
+/// Wrap a slice of content lines with a labeled border.
+fn frame_region(label: &str, content: &[String], out: &mut Vec<String>) {
+    let content_w = content
+        .iter()
+        .map(|l| display_width(l.trim_end()))
+        .max()
+        .unwrap_or(0);
+    let label_w = display_width(label);
+    let inner_w = content_w.max(label_w + 2);
+    let frame_w = inner_w + 4; // "│ " + content + " │"
+
+    // Top: ┌─ Label ──...──┐
+    let dashes = frame_w.saturating_sub(label_w + 5);
+    out.push(format!("┌─ {} {}┐", label, "─".repeat(dashes)));
+
+    // Content rows
+    for line in content {
+        out.push(format!("│ {} │", pad_right(line.trim_end(), inner_w)));
+    }
+
+    // Bottom: └──...──┘
+    out.push(format!("└{}┘", "─".repeat(frame_w - 2)));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,6 +492,7 @@ mod tests {
                     label: None,
                 },
             ],
+            subgraphs: None,
         };
         let lines = render(&d, &mut ctx(40)).unwrap();
         assert!(lines.iter().any(|l| l.contains('A')));
@@ -364,6 +505,7 @@ mod tests {
             title: None,
             nodes: None,
             edges: vec![],
+            subgraphs: None,
         };
         assert!(render(&d, &mut ctx(40)).is_err());
     }
@@ -387,6 +529,7 @@ mod tests {
                 to: "b".into(),
                 label: None,
             }],
+            subgraphs: None,
         };
         let lines = render(&d, &mut ctx(30)).unwrap();
         assert!(lines.iter().any(|l| l.contains("Start")));
@@ -420,6 +563,7 @@ mod tests {
                     label: None,
                 },
             ],
+            subgraphs: None,
         };
         let lines = render(&d, &mut ctx(40)).unwrap();
         let has_bc_same_line = lines.iter().any(|l| l.contains('B') && l.contains('C'));
@@ -443,6 +587,7 @@ mod tests {
                     label: None,
                 },
             ],
+            subgraphs: None,
         };
         let lines = render(&d, &mut ctx(40)).unwrap();
         let has_merge = lines
@@ -469,6 +614,7 @@ mod tests {
                     label: None,
                 },
             ],
+            subgraphs: None,
         };
         let lines = render(&d, &mut ctx(40)).unwrap();
         let has_split = lines
@@ -569,6 +715,7 @@ mod tests {
                     label: None,
                 },
             ],
+            subgraphs: None,
         };
         let lines = render(&d, &mut ctx(40)).unwrap();
         // No merge/split characters in a linear chain
@@ -598,6 +745,7 @@ mod tests {
                     label: None,
                 },
             ],
+            subgraphs: None,
         };
         let lines = render(&d, &mut ctx(40)).unwrap();
         // "A" should be centered (indented), not left-aligned
@@ -627,6 +775,7 @@ mod tests {
                 to: "b".into(),
                 label: None,
             }],
+            subgraphs: None,
         };
         let lines = render(&d, &mut ctx(40)).unwrap();
         assert!(lines.iter().any(|l| l.contains("Short")));
@@ -655,6 +804,7 @@ mod tests {
                     label: None,
                 },
             ],
+            subgraphs: None,
         };
         let lines = render(&d, &mut ctx(40)).unwrap();
         // All three sources should be on the same line
@@ -668,5 +818,120 @@ mod tests {
             .find(|l| l.contains('T') && !l.contains('X'))
             .unwrap();
         assert!(t_line.starts_with(' '), "fan-in target should be centered");
+    }
+
+    // --- Additional helper tests ---
+
+    #[test]
+    fn char_row_places_char_at_position() {
+        let row = char_row(3, '│', 10);
+        assert_eq!(row, "   │      ");
+    }
+
+    #[test]
+    fn char_row_out_of_bounds_safe() {
+        let row = char_row(100, '│', 5);
+        assert_eq!(row, "     ");
+    }
+
+    #[test]
+    fn multi_char_row_multiple_positions() {
+        let row = multi_char_row(&[1, 5, 8], '▼', 10);
+        assert_eq!(row, " ▼   ▼  ▼ ");
+    }
+
+    #[test]
+    fn multi_char_row_empty_positions() {
+        let row = multi_char_row(&[], '▼', 5);
+        assert_eq!(row, "     ");
+    }
+
+    #[test]
+    fn render_level_produces_three_lines() {
+        let mut out = Vec::new();
+        render_level(&["A", "B"], 0, &mut out);
+        assert_eq!(out.len(), 3);
+        assert!(out[0].contains('┌'));
+        assert!(out[1].contains('A'));
+        assert!(out[1].contains('B'));
+        assert!(out[2].contains('└'));
+    }
+
+    #[test]
+    fn render_level_with_offset_indents() {
+        let mut out = Vec::new();
+        render_level(&["X"], 5, &mut out);
+        assert!(out[0].starts_with("     ┌"));
+    }
+
+    #[test]
+    fn render_arrows_straight_when_aligned() {
+        // src and dst at same position → straight │▼
+        let mut out = Vec::new();
+        render_arrows(&[5], &[5], &[(0, 0)], 20, &mut out);
+        assert_eq!(out.len(), 2);
+        assert!(out[0].contains('│'));
+        assert!(out[1].contains('▼'));
+        assert!(!out[0].contains('─'), "should not have horizontal line");
+    }
+
+    #[test]
+    fn render_arrows_straight_for_single_edge_misaligned() {
+        // Single 1:1 connection with different centers → still straight
+        let mut out = Vec::new();
+        render_arrows(&[3], &[7], &[(0, 0)], 20, &mut out);
+        assert_eq!(out.len(), 2); // no connector line
+        assert!(out[0].contains('│'));
+        assert!(out[1].contains('▼'));
+    }
+
+    #[test]
+    fn render_arrows_fan_in_has_connector() {
+        let mut out = Vec::new();
+        render_arrows(&[2, 10], &[6], &[(0, 0), (1, 0)], 20, &mut out);
+        assert_eq!(out.len(), 3); // │ line, connector, ▼ line
+        assert!(out[1].contains('─'), "fan-in needs horizontal connector");
+    }
+
+    #[test]
+    fn frame_region_wraps_content() {
+        let content = vec!["hello".to_string(), "world".to_string()];
+        let mut out = Vec::new();
+        frame_region("Test", &content, &mut out);
+        assert!(out[0].contains("Test"), "top border should have label");
+        assert!(out[0].starts_with("┌─"));
+        assert!(out[1].starts_with("│ "));
+        assert!(out.last().unwrap().starts_with("└"));
+        assert_eq!(out.len(), 4); // top + 2 content + bottom
+    }
+
+    #[test]
+    fn should_render_subgraph_via_json_input() {
+        let d = DagDiagram {
+            title: None,
+            nodes: Some(vec![
+                Node {
+                    id: Some("a".into()),
+                    label: "X".into(),
+                },
+                Node {
+                    id: Some("b".into()),
+                    label: "Y".into(),
+                },
+            ]),
+            edges: vec![Edge {
+                from: "a".into(),
+                to: "b".into(),
+                label: None,
+            }],
+            subgraphs: Some(vec![crate::schema::Subgraph {
+                label: "Group".into(),
+                node_ids: vec!["a".into()],
+            }]),
+        };
+        let lines = render(&d, &mut ctx(40)).unwrap();
+        let output = lines.join("\n");
+        assert!(output.contains("Group"), "should have subgraph frame");
+        assert!(output.contains("X"), "should render node");
     }
 }
