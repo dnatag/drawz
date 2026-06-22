@@ -51,8 +51,11 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package
+        env:
+          COPYFILE_DISABLE: "1"
         run: |
           cd target/${{ matrix.target }}/release
+          chmod 755 drawz
           tar czf ../../../${{ matrix.artifact }} drawz
           cd ../../..
 

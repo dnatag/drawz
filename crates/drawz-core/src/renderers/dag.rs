@@ -1,10 +1,15 @@
 //! DAG (directed acyclic graph) renderer — uses ascii-dag for layout, custom rendering.
 
+use std::collections::HashMap;
+
 use ascii_dag::Graph;
 
 use crate::measure::{display_width, pad_right};
 use crate::result::RenderContext;
 use crate::schema::DagDiagram;
+
+/// Horizontal spacing between boxes on the same level.
+const BOX_SPACING: usize = 3;
 
 /// Render a DAG using ascii-dag's Sugiyama layout for layer assignment,
 /// with our own clean box-and-arrow rendering style.
@@ -17,7 +22,7 @@ pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Ve
         return Err("dag requires at least one edge or node".to_string());
     }
 
-    // Build node ID → label mapping
+    // Build ordered node IDs (preserving first-seen order)
     let mut node_ids: Vec<&str> = Vec::new();
     if let Some(nodes) = &diagram.nodes {
         for n in nodes {
@@ -28,13 +33,19 @@ pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Ve
         }
     }
     for e in &diagram.edges {
-        if !node_ids.contains(&e.from.as_str()) {
-            node_ids.push(&e.from);
-        }
-        if !node_ids.contains(&e.to.as_str()) {
-            node_ids.push(&e.to);
+        for id in [e.from.as_str(), e.to.as_str()] {
+            if !node_ids.contains(&id) {
+                node_ids.push(id);
+            }
         }
     }
+
+    // Map node ID → index for O(1) lookup
+    let id_to_idx: HashMap<&str, usize> = node_ids
+        .iter()
+        .enumerate()
+        .map(|(i, &id)| (id, i))
+        .collect();
 
     // Build ascii-dag graph for layout computation
     let nodes_with_ids: Vec<(usize, &str)> = node_ids
@@ -47,12 +58,9 @@ pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Ve
         .edges
         .iter()
         .filter_map(|e| {
-            let from = node_ids.iter().position(|&n| n == e.from)?;
-            let to = node_ids.iter().position(|&n| n == e.to)?;
-            if from == to {
-                return None;
-            }
-            Some((from, to))
+            let from = *id_to_idx.get(e.from.as_str())?;
+            let to = *id_to_idx.get(e.to.as_str())?;
+            (from != to).then_some((from, to))
         })
         .collect();
 
@@ -62,30 +70,74 @@ pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Ve
         return Err("cycle detected in dag".to_string());
     }
 
-    // Use layout IR to get level assignments
+    // Group nodes by level using Sugiyama layout
     let ir = dag.compute_layout();
     let level_count = ir.level_count();
-
-    // Group nodes by level
     let mut levels: Vec<Vec<&str>> = vec![Vec::new(); level_count];
     for node in ir.nodes() {
         levels[node.level].push(node.label);
     }
 
-    // Render each level with our own clean style
+    // Build label → (level, position) index for O(1) edge matching
+    let mut label_pos: HashMap<&str, (usize, usize)> = HashMap::new();
+    for (level_idx, level) in levels.iter().enumerate() {
+        for (pos, &label) in level.iter().enumerate() {
+            label_pos.insert(label, (level_idx, pos));
+        }
+    }
+
+    // Pre-compute level widths and centering offsets
+    let level_widths: Vec<usize> = levels.iter().map(|level| level_width(level)).collect();
+    let max_level_w = level_widths.iter().copied().max().unwrap_or(0);
+    let offsets: Vec<usize> = level_widths
+        .iter()
+        .map(|&w| max_level_w.saturating_sub(w) / 2)
+        .collect();
+
+    // Render
     let mut lines = Vec::new();
     for (level_idx, level) in levels.iter().enumerate() {
         if level.is_empty() {
             continue;
         }
 
-        render_level(level, ctx, &mut lines);
+        render_level(level, offsets[level_idx], &mut lines);
 
-        // Arrow between levels (not after last)
-        if level_idx < level_count - 1 {
-            lines.push(pad_right("  │", ctx.inner_width));
-            lines.push(pad_right("  ▼", ctx.inner_width));
+        if level_idx >= level_count - 1 {
+            continue;
         }
+
+        let next_idx = level_idx + 1;
+        let next_level = &levels[next_idx];
+        if next_level.is_empty() {
+            let center = offsets[level_idx] + level_widths[level_idx] / 2;
+            lines.push(char_row(center, '│', ctx.inner_width));
+            lines.push(char_row(center, '▼', ctx.inner_width));
+            continue;
+        }
+
+        let cur_centers = box_centers(level, offsets[level_idx]);
+        let next_centers = box_centers(next_level, offsets[next_idx]);
+
+        // Resolve edges between these two levels via pre-built index
+        let level_edges: Vec<(usize, usize)> = edges_with_ids
+            .iter()
+            .filter_map(|&(from_id, to_id)| {
+                let from_label = nodes_with_ids[from_id].1;
+                let to_label = nodes_with_ids[to_id].1;
+                let &(fl, fp) = label_pos.get(from_label)?;
+                let &(tl, tp) = label_pos.get(to_label)?;
+                (fl == level_idx && tl == next_idx).then_some((fp, tp))
+            })
+            .collect();
+
+        render_arrows(
+            &cur_centers,
+            &next_centers,
+            &level_edges,
+            ctx.inner_width,
+            &mut lines,
+        );
     }
 
     if lines.is_empty() {
@@ -95,11 +147,51 @@ pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Ve
     Ok(lines)
 }
 
-fn render_level(labels: &[&str], _ctx: &mut RenderContext, out: &mut Vec<String>) {
-    // Render all nodes in one row at natural size — no truncation
-    let spacing = 3;
+// --- Helpers ---
+
+/// Total display width of a level's boxes including spacing.
+fn level_width(labels: &[&str]) -> usize {
+    if labels.is_empty() {
+        return 0;
+    }
+    let box_widths: usize = labels.iter().map(|l| display_width(l) + 4).sum();
+    box_widths + (labels.len() - 1) * BOX_SPACING
+}
+
+/// Compute center x-position of each box given an offset.
+fn box_centers(labels: &[&str], offset: usize) -> Vec<usize> {
+    let mut centers = Vec::with_capacity(labels.len());
+    let mut x = offset;
+    for &label in labels {
+        let w = display_width(label) + 4;
+        centers.push(x + w / 2);
+        x += w + BOX_SPACING;
+    }
+    centers
+}
+
+/// Create a row with a single character at position `x`, rest spaces.
+fn char_row(x: usize, ch: char, width: usize) -> String {
+    let mut row = vec![' '; width];
+    if x < width {
+        row[x] = ch;
+    }
+    row.into_iter().collect()
+}
+
+/// Collect unique sorted values from an iterator.
+fn sorted_unique(iter: impl Iterator<Item = usize>) -> Vec<usize> {
+    let mut v: Vec<usize> = iter.collect();
+    v.sort_unstable();
+    v.dedup();
+    v
+}
+
+/// Render boxes for one level at the given x-offset.
+fn render_level(labels: &[&str], offset: usize, out: &mut Vec<String>) {
     let widths: Vec<usize> = labels.iter().map(|l| display_width(l) + 4).collect();
-    let sep = " ".repeat(spacing);
+    let sep = " ".repeat(BOX_SPACING);
+    let prefix = " ".repeat(offset);
 
     let top: String = widths
         .iter()
@@ -118,20 +210,105 @@ fn render_level(labels: &[&str], _ctx: &mut RenderContext, out: &mut Vec<String>
         .collect::<Vec<_>>()
         .join(&sep);
 
-    out.push(top);
-    out.push(mid);
-    out.push(bot);
+    out.push(format!("{prefix}{top}"));
+    out.push(format!("{prefix}{mid}"));
+    out.push(format!("{prefix}{bot}"));
+}
+
+/// Render arrows between two levels based on actual edge topology.
+fn render_arrows(
+    src_centers: &[usize],
+    dst_centers: &[usize],
+    edges: &[(usize, usize)],
+    width: usize,
+    out: &mut Vec<String>,
+) {
+    if edges.is_empty() {
+        out.push(pad_right("  │", width));
+        out.push(pad_right("  ▼", width));
+        return;
+    }
+
+    let src_xs = sorted_unique(edges.iter().map(|&(s, _)| src_centers[s]));
+    let dst_xs = sorted_unique(edges.iter().map(|&(_, d)| dst_centers[d]));
+
+    // Straight-down case: sources and destinations align perfectly
+    if src_xs == dst_xs {
+        out.push(multi_char_row(&src_xs, '│', width));
+        out.push(multi_char_row(&dst_xs, '▼', width));
+        return;
+    }
+
+    // Complex case: horizontal connector needed
+    out.push(multi_char_row(&src_xs, '│', width));
+
+    // Connector line spanning all involved positions
+    let all_xs = sorted_unique(src_xs.iter().chain(dst_xs.iter()).copied());
+    let left = all_xs[0];
+    let right = *all_xs.last().unwrap();
+
+    let mut row = vec![' '; width];
+    let fill_end = right.min(width - 1);
+    for ch in &mut row[left..=fill_end] {
+        *ch = '─';
+    }
+
+    for &x in &all_xs {
+        if x >= width {
+            continue;
+        }
+        row[x] = junction_char(
+            src_xs.contains(&x),
+            dst_xs.contains(&x),
+            x > left,
+            x < right,
+        );
+    }
+    out.push(row.into_iter().collect());
+
+    out.push(multi_char_row(&dst_xs, '▼', width));
+}
+
+/// Place a character at multiple x-positions in a row.
+fn multi_char_row(positions: &[usize], ch: char, width: usize) -> String {
+    let mut row = vec![' '; width];
+    for &x in positions {
+        if x < width {
+            row[x] = ch;
+        }
+    }
+    row.into_iter().collect()
+}
+
+/// Select the correct box-drawing junction character.
+fn junction_char(from_above: bool, to_below: bool, has_left: bool, has_right: bool) -> char {
+    match (from_above, to_below, has_left, has_right) {
+        (true, true, true, true) => '┼',
+        (true, true, true, false) => '┤',
+        (true, true, false, true) => '├',
+        (true, true, false, false) => '│',
+        (true, false, true, true) => '┴',
+        (true, false, true, false) => '┘',
+        (true, false, false, true) => '└',
+        (true, false, false, false) => '│',
+        (false, true, true, true) => '┬',
+        (false, true, true, false) => '┐',
+        (false, true, false, true) => '┌',
+        (false, true, false, false) => '│',
+        _ => '─',
+    }
 }
 
 fn get_label<'a>(id: &'a str, diagram: &'a DagDiagram) -> &'a str {
-    if let Some(nodes) = &diagram.nodes {
-        nodes
-            .iter()
-            .find(|n| n.id.as_deref().unwrap_or(&n.label) == id)
-            .map_or(id, |n| &n.label)
-    } else {
-        id
-    }
+    diagram
+        .nodes
+        .as_ref()
+        .and_then(|nodes| {
+            nodes
+                .iter()
+                .find(|n| n.id.as_deref().unwrap_or(&n.label) == id)
+        })
+        .map_or(id, |n| &n.label)
 }
 
 #[cfg(test)]
@@ -245,8 +422,251 @@ mod tests {
             ],
         };
         let lines = render(&d, &mut ctx(40)).unwrap();
-        // B and C should appear on the same line (parallel)
         let has_bc_same_line = lines.iter().any(|l| l.contains('B') && l.contains('C'));
         assert!(has_bc_same_line, "B and C should be in same layer");
+    }
+
+    #[test]
+    fn should_render_converging_arrows_when_fan_in() {
+        let d = DagDiagram {
+            title: None,
+            nodes: None,
+            edges: vec![
+                Edge {
+                    from: "X".into(),
+                    to: "Z".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "Y".into(),
+                    to: "Z".into(),
+                    label: None,
+                },
+            ],
+        };
+        let lines = render(&d, &mut ctx(40)).unwrap();
+        let has_merge = lines
+            .iter()
+            .any(|l| l.contains('┘') || l.contains('┴') || l.contains('└') || l.contains('┬'));
+        assert!(has_merge, "fan-in should show converging arrows");
+        assert!(lines.iter().any(|l| l.contains('▼')));
+    }
+
+    #[test]
+    fn should_render_diverging_arrows_when_fan_out() {
+        let d = DagDiagram {
+            title: None,
+            nodes: None,
+            edges: vec![
+                Edge {
+                    from: "Z".into(),
+                    to: "X".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "Z".into(),
+                    to: "Y".into(),
+                    label: None,
+                },
+            ],
+        };
+        let lines = render(&d, &mut ctx(40)).unwrap();
+        let has_split = lines
+            .iter()
+            .any(|l| l.contains('┬') || l.contains('┌') || l.contains('┐'));
+        assert!(has_split, "fan-out should show diverging arrows");
+        let arrow_count: usize = lines
+            .iter()
+            .map(|l| l.chars().filter(|&c| c == '▼').count())
+            .sum();
+        assert!(
+            arrow_count >= 2,
+            "fan-out should have 2+ arrows: got {arrow_count}"
+        );
+    }
+
+    // --- Helper function tests ---
+
+    #[test]
+    fn level_width_single_node() {
+        assert_eq!(level_width(&["A"]), 5); // "A" + 4 = 5
+    }
+
+    #[test]
+    fn level_width_multiple_nodes() {
+        // "A"(5) + spacing(3) + "B"(5) = 13
+        assert_eq!(level_width(&["A", "B"]), 13);
+    }
+
+    #[test]
+    fn level_width_empty() {
+        assert_eq!(level_width(&[]), 0);
+    }
+
+    #[test]
+    fn box_centers_single() {
+        let c = box_centers(&["Hello"], 0);
+        // box width = 9, center = 4
+        assert_eq!(c, vec![4]);
+    }
+
+    #[test]
+    fn box_centers_with_offset() {
+        let c = box_centers(&["A"], 10);
+        // box width = 5, center = 10 + 2 = 12
+        assert_eq!(c, vec![12]);
+    }
+
+    #[test]
+    fn box_centers_multiple() {
+        let c = box_centers(&["A", "B"], 0);
+        // A: w=5, center=2. B: x=5+3=8, w=5, center=10
+        assert_eq!(c, vec![2, 10]);
+    }
+
+    #[test]
+    fn junction_char_passthrough() {
+        assert_eq!(junction_char(true, true, true, true), '┼');
+    }
+
+    #[test]
+    fn junction_char_fan_in_left_end() {
+        assert_eq!(junction_char(true, false, false, true), '└');
+    }
+
+    #[test]
+    fn junction_char_fan_in_right_end() {
+        assert_eq!(junction_char(true, false, true, false), '┘');
+    }
+
+    #[test]
+    fn junction_char_fan_out_split() {
+        assert_eq!(junction_char(false, true, true, true), '┬');
+    }
+
+    #[test]
+    fn sorted_unique_deduplicates() {
+        let v = sorted_unique([3, 1, 2, 1, 3].into_iter());
+        assert_eq!(v, vec![1, 2, 3]);
+    }
+
+    // --- Arrow rendering edge cases ---
+
+    #[test]
+    fn should_render_straight_arrows_when_linear_chain() {
+        let d = DagDiagram {
+            title: None,
+            nodes: None,
+            edges: vec![
+                Edge {
+                    from: "A".into(),
+                    to: "B".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "B".into(),
+                    to: "C".into(),
+                    label: None,
+                },
+            ],
+        };
+        let lines = render(&d, &mut ctx(40)).unwrap();
+        // No merge/split characters in a linear chain
+        let has_junction = lines
+            .iter()
+            .any(|l| l.contains('┬') || l.contains('┴') || l.contains('┼'));
+        assert!(!has_junction, "linear chain should have no junction chars");
+        // Should have straight vertical arrows
+        assert!(lines.iter().any(|l| l.contains('│')));
+        assert!(lines.iter().any(|l| l.contains('▼')));
+    }
+
+    #[test]
+    fn should_center_single_node_levels() {
+        let d = DagDiagram {
+            title: None,
+            nodes: None,
+            edges: vec![
+                Edge {
+                    from: "A".into(),
+                    to: "B".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "A".into(),
+                    to: "C".into(),
+                    label: None,
+                },
+            ],
+        };
+        let lines = render(&d, &mut ctx(40)).unwrap();
+        // "A" should be centered (indented), not left-aligned
+        let a_line = lines.iter().find(|l| l.contains('A')).unwrap();
+        assert!(
+            a_line.starts_with(' '),
+            "single-node level should be centered"
+        );
+    }
+
+    #[test]
+    fn should_handle_wide_label_difference_between_levels() {
+        let d = DagDiagram {
+            title: None,
+            nodes: Some(vec![
+                Node {
+                    id: Some("a".into()),
+                    label: "Short".into(),
+                },
+                Node {
+                    id: Some("b".into()),
+                    label: "A Very Long Node Label".into(),
+                },
+            ]),
+            edges: vec![Edge {
+                from: "a".into(),
+                to: "b".into(),
+                label: None,
+            }],
+        };
+        let lines = render(&d, &mut ctx(40)).unwrap();
+        assert!(lines.iter().any(|l| l.contains("Short")));
+        assert!(lines.iter().any(|l| l.contains("A Very Long Node Label")));
+    }
+
+    #[test]
+    fn should_render_three_to_one_fan_in_with_centered_target() {
+        let d = DagDiagram {
+            title: None,
+            nodes: None,
+            edges: vec![
+                Edge {
+                    from: "X".into(),
+                    to: "T".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "Y".into(),
+                    to: "T".into(),
+                    label: None,
+                },
+                Edge {
+                    from: "Z".into(),
+                    to: "T".into(),
+                    label: None,
+                },
+            ],
+        };
+        let lines = render(&d, &mut ctx(40)).unwrap();
+        // All three sources should be on the same line
+        let has_xyz = lines
+            .iter()
+            .any(|l| l.contains('X') && l.contains('Y') && l.contains('Z'));
+        assert!(has_xyz, "all sources should be on same level");
+        // Target should be centered (indented)
+        let t_line = lines
+            .iter()
+            .find(|l| l.contains('T') && !l.contains('X'))
+            .unwrap();
+        assert!(t_line.starts_with(' '), "fan-in target should be centered");
     }
 }
