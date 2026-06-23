@@ -48,7 +48,7 @@ pub(crate) fn render(
     }
 }
 
-fn render_horizontal(labels: &[&str], _ctx: &mut RenderContext) -> Vec<String> {
+fn render_horizontal(labels: &[&str], ctx: &mut RenderContext) -> Vec<String> {
     let arrow = "───→";
     let arrow_w = display_width(arrow);
 
@@ -57,12 +57,16 @@ fn render_horizontal(labels: &[&str], _ctx: &mut RenderContext) -> Vec<String> {
     let total_w: usize = widths.iter().sum::<usize>() + (labels.len() - 1) * (arrow_w + 2);
 
     // If total natural width exceeds inner_width, fall back to vertical
-    if total_w > _ctx.inner_width {
+    if total_w > ctx.inner_width {
+        ctx.warnings.push(format!(
+            "LR flow needs {total_w} cols but only {} available; rendered vertically",
+            ctx.inner_width
+        ));
         let steps: Vec<FlowStep> = labels
             .iter()
             .map(|&l| FlowStep::Label(l.to_string()))
             .collect();
-        return render_steps(&steps, _ctx, 0).unwrap_or_default();
+        return render_steps(&steps, ctx, 0).unwrap_or_default();
     }
 
     // Build 3 lines: top borders, middle labels, bottom borders

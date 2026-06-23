@@ -21,7 +21,24 @@ fn render_diagram_tool() -> Tool {
     // This prevents strict MCP clients from stripping diagram-specific fields.
     Tool {
         name: "render_diagram".into(),
-        description: Some("Render a structured diagram as perfectly-aligned ASCII/Unicode art for terminal display. Accepts JSON with a 'type' field: freeform, mermaid, flow, table, tree, sequence, state, dag, or component. Pass all diagram-specific fields directly (e.g. steps, headers, rows, indent, code, actors, messages, transitions, edges, nodes, content, groups, connections). The response includes 'rendered_width' showing the diagram's character width. If the user says output is too wide, re-render with width set to half of rendered_width. The width is remembered for the session. IMPORTANT: Always display the 'output' field in a code block — tool results are not shown to the user automatically. Call introspect_drawz for per-type field documentation.".into()),
+        description: Some(concat!(
+            "Render a structured diagram as perfectly-aligned ASCII/Unicode art for terminal display. ",
+            "Accepts JSON with a 'type' field: freeform, mermaid, flow, table, tree, sequence, state, dag, or component. ",
+            "The response includes 'rendered_width' showing the diagram's character width. ",
+            "If the user says output is too wide, re-render with width set to half of rendered_width. The width is remembered for the session. ",
+            "IMPORTANT: Always display the 'output' field in a code block — tool results are not shown to the user automatically. ",
+            "Call introspect_drawz for per-type field documentation. ",
+            "Field signatures: ",
+            "flow: steps[], direction?:\"LR\" | ",
+            "table: headers[], rows[][] | ",
+            "tree: indent (2-space indented string) | ",
+            "sequence: actors[], messages[{from,to,label}] | ",
+            "state: transitions[{from,to,label?}] | ",
+            "dag: edges[{from,to,label?}], nodes?[] | ",
+            "component: groups[{label,nodes[]}], connections[{from,to,label?}] | ",
+            "freeform: content | ",
+            "mermaid: code",
+        ).into()),
         input_schema: ToolInputSchema::new(
             vec!["type".into()],
             None,

@@ -304,3 +304,28 @@ fn flow_empty_label_does_not_panic() {
     let result = render(&d, 30);
     assert!(result.output.is_some() || !result.errors.is_empty());
 }
+
+#[test]
+fn should_warn_when_lr_falls_back_to_vertical() {
+    let d = Diagram::Flow(FlowDiagram {
+        title: None,
+        direction: Some("LR".into()),
+        steps: Some(vec![
+            FlowStep::Label("JSON Input".into()),
+            FlowStep::Label("schema.rs (deserialize)".into()),
+            FlowStep::Label("render.rs (dispatch)".into()),
+            FlowStep::Label("renderers/* (type-specific)".into()),
+        ]),
+        nodes: None,
+        edges: None,
+    });
+    let result = render(&d, 50);
+    assert!(
+        result
+            .warnings
+            .iter()
+            .any(|w| w.contains("LR") && w.contains("vertically")),
+        "expected LR fallback warning, got: {:?}",
+        result.warnings
+    );
+}
