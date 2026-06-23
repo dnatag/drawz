@@ -1,3 +1,5 @@
+/// Component architecture diagram renderer.
+pub mod component;
 /// DAG dependency graph renderer.
 pub mod dag;
 /// Vertical pipeline flow renderer.

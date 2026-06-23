@@ -8,11 +8,11 @@ test:
 
 # Run integration tests only
 test-int:
-    cargo test -p drawz-core --test freeform --test table --test tree --test flow --test state --test sequence --test dag --test mermaid
+    cargo test -p drawz-core --test freeform --test table --test tree --test flow --test state --test sequence --test dag --test mermaid --test component
 
 # Run integration tests with visible diagram output
 test-print:
-    cargo test -p drawz-core --test freeform --test table --test tree --test flow --test state --test sequence --test dag --test mermaid -- --nocapture
+    cargo test -p drawz-core --test freeform --test table --test tree --test flow --test state --test sequence --test dag --test mermaid --test component -- --nocapture
 
 # Run clippy with pedantic lints
 lint:

@@ -156,7 +156,7 @@ fn render_state_with_branch(
     let arrow_label = if branch_label.is_empty() {
         "────→".to_string()
     } else {
-        format!("──{}──→", branch_label)
+        format!("──{branch_label}──→")
     };
     let arrow_w = display_width(&arrow_label);
 
@@ -179,11 +179,11 @@ fn render_state_with_branch(
 
     // Build the three lines side by side
     let state_top = format!("╭{}╮", "─".repeat(state_w - 2));
-    let state_mid = format!("│ {} │", state);
+    let state_mid = format!("│ {state} │");
     let state_bot = format!("╰{}╯", "─".repeat(state_w - 2));
 
     let target_top = format!("╭{}╮", "─".repeat(target_w - 2));
-    let target_mid = format!("│ {} │", target);
+    let target_mid = format!("│ {target} │");
     let target_bot = format!("╰{}╯", "─".repeat(target_w - 2));
 
     let spacer_top = " ".repeat(gap + arrow_w + gap);

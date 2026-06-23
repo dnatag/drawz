@@ -23,6 +23,7 @@ pub fn render(diagram: &Diagram, width: u16) -> RenderResult {
             | Diagram::State(_)
             | Diagram::Sequence(_)
             | Diagram::Dag(_)
+            | Diagram::Component(_)
     );
 
     // Use requested width as inner_width for layout hints, but renderers
@@ -49,6 +50,7 @@ pub fn render(diagram: &Diagram, width: u16) -> RenderResult {
         Diagram::State(d) => renderers::state::render(d, &mut ctx),
         Diagram::Sequence(d) => renderers::sequence::render(d, &mut ctx),
         Diagram::Dag(d) => renderers::dag::render(d, &mut ctx),
+        Diagram::Component(d) => renderers::component::render(d, &mut ctx),
         Diagram::Mermaid(d) => {
             match mermaid::parse(&d.code) {
                 Ok(mut parsed) => {
@@ -140,6 +142,7 @@ fn extract_title(diagram: &Diagram) -> Option<&str> {
         Diagram::State(d) => d.title.as_deref(),
         Diagram::Sequence(d) => d.title.as_deref(),
         Diagram::Dag(d) => d.title.as_deref(),
+        Diagram::Component(d) => d.title.as_deref(),
         Diagram::Mermaid(d) => d.title.as_deref(),
     }
 }
@@ -154,6 +157,7 @@ fn set_title(diagram: &mut Diagram, title: Option<&str>) {
         Diagram::State(d) => d.title = t,
         Diagram::Sequence(d) => d.title = t,
         Diagram::Dag(d) => d.title = t,
+        Diagram::Component(d) => d.title = t,
         Diagram::Mermaid(d) => d.title = t,
     }
 }

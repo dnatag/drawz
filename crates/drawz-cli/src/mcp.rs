@@ -21,7 +21,7 @@ fn render_diagram_tool() -> Tool {
     // This prevents strict MCP clients from stripping diagram-specific fields.
     Tool {
         name: "render_diagram".into(),
-        description: Some("Render a structured diagram as perfectly-aligned ASCII/Unicode art for terminal display. Accepts JSON with a 'type' field: freeform, mermaid, flow, table, tree, sequence, state, or dag. Pass all diagram-specific fields directly (e.g. steps, headers, rows, indent, code, actors, messages, transitions, edges, nodes, content). The response includes 'rendered_width' showing the diagram's character width. If the user says output is too wide, re-render with width set to half of rendered_width. The width is remembered for the session. IMPORTANT: Always display the 'output' field in a code block — tool results are not shown to the user automatically. Call introspect_drawz for per-type field documentation.".into()),
+        description: Some("Render a structured diagram as perfectly-aligned ASCII/Unicode art for terminal display. Accepts JSON with a 'type' field: freeform, mermaid, flow, table, tree, sequence, state, dag, or component. Pass all diagram-specific fields directly (e.g. steps, headers, rows, indent, code, actors, messages, transitions, edges, nodes, content, groups, connections). The response includes 'rendered_width' showing the diagram's character width. If the user says output is too wide, re-render with width set to half of rendered_width. The width is remembered for the session. IMPORTANT: Always display the 'output' field in a code block — tool results are not shown to the user automatically. Call introspect_drawz for per-type field documentation.".into()),
         input_schema: ToolInputSchema::new(
             vec!["type".into()],
             None,
@@ -155,7 +155,8 @@ fn call_introspect() -> CallToolResult {
             {"name": "tree", "use_when": "File structures, hierarchies", "minimal": r#"{"type":"tree","indent":"src\n  main.rs\n  lib.rs"}"#, "fields": "indent: string (2-space indented) | root: {label, children: [{label,children}]}"},
             {"name": "sequence", "use_when": "API interactions, protocols", "minimal": r#"{"type":"sequence","actors":["A","B"],"messages":[{"from":"A","to":"B","label":"hi"}]}"#, "fields": "actors: string[], messages: [{from,to,label}]"},
             {"name": "state", "use_when": "State machines, lifecycles", "minimal": r#"{"type":"state","transitions":[{"from":"A","to":"B","label":"go"}]}"#, "fields": "transitions: [{from,to,label?}], states?: string[] or [{id?,label}]"},
-            {"name": "dag", "use_when": "Task dependencies, build graphs", "minimal": r#"{"type":"dag","edges":[{"from":"A","to":"B"}]}"#, "fields": "edges: [{from,to,label?}], nodes?: string[] or [{id?,label}] (inferred from edges if omitted)"}
+            {"name": "dag", "use_when": "Task dependencies, build graphs", "minimal": r#"{"type":"dag","edges":[{"from":"A","to":"B"}]}"#, "fields": "edges: [{from,to,label?}], nodes?: string[] or [{id?,label}] (inferred from edges if omitted)"},
+            {"name": "component", "use_when": "Architecture diagrams with grouped subsystems and labeled connections between them", "minimal": r#"{"type":"component","groups":[{"label":"A","nodes":["X"]},{"label":"B","nodes":["Y"]}],"connections":[{"from":"X","to":"Y","label":"call"}]}"#, "fields": "groups: [{label, nodes: string[]}], connections: [{from, to, label?}]"}
         ],
         "common_fields": {"width": "integer, default 80", "title": "string, shown in frame header"},
         "version": env!("CARGO_PKG_VERSION")

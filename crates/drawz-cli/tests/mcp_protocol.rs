@@ -192,8 +192,8 @@ fn introspect_returns_all_types() {
         .unwrap();
     let inner: Value = serde_json::from_str(content).unwrap();
     let types = inner["types"].as_array().unwrap();
-    assert_eq!(types.len(), 8);
-    assert_eq!(inner["version"], "1.0.1");
+    assert_eq!(types.len(), 9);
+    assert_eq!(inner["version"], "1.1.0");
 }
 
 #[test]

@@ -54,7 +54,35 @@ pub(super) fn parse_flowchart(code: &str) -> Result<Diagram, String> {
 
     let has_branching = has_branching_or_merging(&edges);
 
-    if has_branching || !subgraphs.is_empty() {
+    if !subgraphs.is_empty() && all_edges_inter_group(&edges, &subgraphs) {
+        // All edges connect nodes in different subgraphs → component diagram
+        let id_to_label = |id: &str| -> String {
+            nodes
+                .iter()
+                .find(|n| n.id.as_deref() == Some(id))
+                .map_or_else(|| id.to_string(), |n| n.label.clone())
+        };
+        Ok(Diagram::Component(crate::schema::ComponentDiagram {
+            title: None,
+            groups: subgraphs
+                .iter()
+                .map(|sg| crate::schema::ComponentGroup {
+                    label: sg.label.clone(),
+                    nodes: sg.node_ids.iter().map(|id| id_to_label(id)).collect(),
+                    chains: vec![],
+                    edges: vec![],
+                })
+                .collect(),
+            connections: edges
+                .iter()
+                .map(|e| crate::schema::Connection {
+                    from: id_to_label(&e.from),
+                    to: id_to_label(&e.to),
+                    label: e.label.clone(),
+                })
+                .collect(),
+        }))
+    } else if has_branching || !subgraphs.is_empty() {
         Ok(Diagram::Dag(DagDiagram {
             title: None,
             nodes: Some(nodes),
@@ -87,6 +115,17 @@ fn has_branching_or_merging(edges: &[Edge]) -> bool {
         }
     }
     false
+}
+
+/// Check if all edges connect nodes in different subgraphs (no intra-group edges).
+fn all_edges_inter_group(edges: &[Edge], subgraphs: &[crate::schema::Subgraph]) -> bool {
+    edges.iter().all(|e| {
+        let from_sg = subgraphs
+            .iter()
+            .position(|sg| sg.node_ids.contains(&e.from));
+        let to_sg = subgraphs.iter().position(|sg| sg.node_ids.contains(&e.to));
+        from_sg != to_sg // Different groups (or one is ungrouped)
+    })
 }
 
 /// Parse a single statement, extracting nodes and edges.

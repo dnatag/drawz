@@ -33,6 +33,7 @@ pub enum Diagram {
     Sequence(SequenceDiagram),
     Table(TableDiagram),
     Dag(DagDiagram),
+    Component(ComponentDiagram),
     Freeform(FreeformDiagram),
     Mermaid(MermaidDiagram),
 }
@@ -130,6 +131,39 @@ pub struct DagDiagram {
 pub struct Subgraph {
     pub label: String,
     pub node_ids: Vec<String>,
+}
+
+/// Architecture diagram: groups of nodes with labeled connections between them.
+/// `{ "type": "component", "groups": [...], "connections": [...] }`
+#[derive(Debug, Deserialize)]
+pub struct ComponentDiagram {
+    pub title: Option<String>,
+    pub groups: Vec<ComponentGroup>,
+    pub connections: Vec<Connection>,
+}
+
+/// A named subsystem containing nodes.
+/// Nodes can be a flat list, or organized into chains (horizontal pipelines).
+#[derive(Debug, Default, Deserialize)]
+pub struct ComponentGroup {
+    pub label: String,
+    /// Flat node list (rendered vertically). Used when no chains provided.
+    #[serde(default)]
+    pub nodes: Vec<String>,
+    /// Horizontal pipelines: each chain renders as A → B → C on one row.
+    #[serde(default)]
+    pub chains: Vec<Vec<String>>,
+    /// Internal connections between nodes (rendered as vertical/L-shaped arrows between chain rows).
+    #[serde(default)]
+    pub edges: Vec<Connection>,
+}
+
+/// A labeled connection between two nodes (which may be in different groups).
+#[derive(Debug, Deserialize)]
+pub struct Connection {
+    pub from: String,
+    pub to: String,
+    pub label: Option<String>,
 }
 
 /// Freeform text block.

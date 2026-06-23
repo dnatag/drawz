@@ -342,3 +342,166 @@ fn dag_minimum_width() {
     let result = render(&d, 4);
     assert!(result.output.is_some() || !result.errors.is_empty());
 }
+
+// --- Showcase tests for P0: fan-in/fan-out rendering ---
+
+#[test]
+fn dag_fan_in_three_to_one() {
+    let d = Diagram::Dag(DagDiagram {
+        title: Some("Fan-in: 3 → 1".into()),
+        nodes: None,
+        edges: vec![
+            Edge {
+                from: "TUI".into(),
+                to: "Server".into(),
+                label: None,
+            },
+            Edge {
+                from: "SSH".into(),
+                to: "Server".into(),
+                label: None,
+            },
+            Edge {
+                from: "Web".into(),
+                to: "Server".into(),
+                label: None,
+            },
+        ],
+        subgraphs: None,
+    });
+    let result = render(&d, 50);
+    assert_and_print("DAG: Fan-in (3 clients → 1 server)", &result, 50);
+    let output = result.output.unwrap();
+    // All sources on same row
+    assert!(output
+        .lines()
+        .any(|l| l.contains("TUI") && l.contains("SSH") && l.contains("Web")));
+    // Converging arrow exists
+    assert!(output.contains('┘') || output.contains('┴') || output.contains('└'));
+}
+
+#[test]
+fn dag_fan_out_one_to_three() {
+    let d = Diagram::Dag(DagDiagram {
+        title: Some("Fan-out: 1 → 3".into()),
+        nodes: None,
+        edges: vec![
+            Edge {
+                from: "Root".into(),
+                to: "A".into(),
+                label: None,
+            },
+            Edge {
+                from: "Root".into(),
+                to: "B".into(),
+                label: None,
+            },
+            Edge {
+                from: "Root".into(),
+                to: "C".into(),
+                label: None,
+            },
+        ],
+        subgraphs: None,
+    });
+    let result = render(&d, 50);
+    assert_and_print("DAG: Fan-out (1 → 3)", &result, 50);
+    let output = result.output.unwrap();
+    // All targets on same row
+    assert!(output
+        .lines()
+        .any(|l| l.contains('A') && l.contains('B') && l.contains('C')));
+}
+
+#[test]
+fn dag_diamond_full_pipeline() {
+    let d = Diagram::Dag(DagDiagram {
+        title: Some("Diamond: A → B,C,D → E".into()),
+        nodes: None,
+        edges: vec![
+            Edge {
+                from: "A".into(),
+                to: "B".into(),
+                label: None,
+            },
+            Edge {
+                from: "A".into(),
+                to: "C".into(),
+                label: None,
+            },
+            Edge {
+                from: "A".into(),
+                to: "D".into(),
+                label: None,
+            },
+            Edge {
+                from: "B".into(),
+                to: "E".into(),
+                label: None,
+            },
+            Edge {
+                from: "C".into(),
+                to: "E".into(),
+                label: None,
+            },
+            Edge {
+                from: "D".into(),
+                to: "E".into(),
+                label: None,
+            },
+        ],
+        subgraphs: None,
+    });
+    let result = render(&d, 50);
+    assert_and_print("DAG: Full diamond (1→3→1)", &result, 50);
+}
+
+// --- Showcase test for P1: subgraph frames ---
+
+#[test]
+fn dag_subgraph_frames() {
+    let d = Diagram::Dag(DagDiagram {
+        title: Some("Subgraph Grouping".into()),
+        nodes: Some(vec![
+            Node {
+                id: Some("a".into()),
+                label: "API".into(),
+            },
+            Node {
+                id: Some("b".into()),
+                label: "Worker".into(),
+            },
+            Node {
+                id: Some("c".into()),
+                label: "DB".into(),
+            },
+        ]),
+        edges: vec![
+            Edge {
+                from: "a".into(),
+                to: "c".into(),
+                label: None,
+            },
+            Edge {
+                from: "b".into(),
+                to: "c".into(),
+                label: None,
+            },
+        ],
+        subgraphs: Some(vec![
+            Subgraph {
+                label: "Services".into(),
+                node_ids: vec!["a".into(), "b".into()],
+            },
+            Subgraph {
+                label: "Storage".into(),
+                node_ids: vec!["c".into()],
+            },
+        ]),
+    });
+    let result = render(&d, 50);
+    assert_and_print("DAG: Subgraph frames (Services + Storage)", &result, 50);
+    let output = result.output.unwrap();
+    assert!(output.contains("Services"));
+    assert!(output.contains("Storage"));
+}
