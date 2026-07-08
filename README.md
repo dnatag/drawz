@@ -59,10 +59,32 @@ drawz mcp
 ## Integration
 
 ```
-MCP:      drawz mcp        — JSON-RPC over stdio, 2 tools (render_diagram, introspect_drawz)
-CLI pipe: echo '...' | drawz — stdin JSON → stdout diagram
+MCP:      drawz mcp          — JSON-RPC over stdio, 2 tools (render_diagram, introspect_drawz)
+CLI pipe: echo '...' | drawz  — stdin JSON → stdout diagram
+CLI flags: drawz render <type> — structured flags, no JSON needed
 Library:  drawz_core::render(&diagram, width) → RenderResult
+Skill:   drawz-shell          — agent renders via shell for instant display
 ```
+
+### Agent Skill (Recommended for Terminal Agents)
+
+The `drawz-shell` skill teaches terminal-based agents (Kiro CLI, etc.) to render diagrams
+via shell instead of MCP. Output appears instantly in the command result — no LLM streaming
+delay.
+
+**Install:**
+
+```sh
+# Symlink into your skills directory
+ln -s /path/to/drawz/skills/drawz-shell ~/.kiro/skills/drawz-shell
+```
+
+**Why skill over MCP?** MCP tool results pass back through the LLM and get streamed
+token-by-token. A 40-line diagram adds 2–3 seconds of pure passthrough. Shell rendering
+bypasses this entirely — the diagram appears in the command output with zero generation cost.
+
+**When to use MCP instead:** GUI contexts (Claude Desktop, Cursor) where shell output is
+collapsed but MCP tool results render in a visible panel.
 
 ### MCP Setup
 
@@ -82,17 +104,50 @@ Add to your MCP client configuration (Claude Desktop, Kiro, Cursor, etc.):
 ### CLI Usage
 
 ```
-Usage: drawz [OPTIONS] [COMMAND]
+Usage: drawz [OPTIONS] [JSON] [COMMAND]
 
 Commands:
-  mcp   Start MCP server (JSON-RPC over stdio)
-  help  Print this message or the help of the given subcommand(s)
+  render  Render a diagram using flags instead of raw JSON
+  mcp     Start MCP server (JSON-RPC over stdio)
+  help    Print this message or the help of the given subcommand(s)
 
 Options:
   -w, --width <WIDTH>  Maximum output width in characters
   -h, --help           Print help
   -V, --version        Print version
 ```
+
+### Render Subcommand
+
+Render diagrams using type-specific flags — no JSON quoting needed:
+
+```sh
+# Flow pipeline
+drawz render flow --steps 'Build,Test,Deploy' --direction LR
+
+# Table
+drawz render table --headers 'Name,Status' --row 'Alice,Active' --row 'Bob,Inactive'
+
+# Tree (use \n for newlines)
+drawz render tree --indent 'src\n  main.rs\n  lib.rs'
+
+# Sequence diagram
+drawz render sequence --actors 'Client,Server' --msg 'Client:Server:GET /api' --msg 'Server:Client:200 OK'
+
+# State machine
+drawz render state --edge 'Idle:Running:start' --edge 'Running:Done:finish'
+
+# DAG
+drawz render dag --edge 'Parse:Lint' --edge 'Parse:Compile' --edge 'Lint:Link' --edge 'Compile:Link'
+
+# Mermaid
+drawz render mermaid --code 'graph LR; A-->B-->C'
+
+# Constrain width
+drawz -w 60 render flow --steps 'A,B,C,D,E'
+```
+
+Edge/message format uses colon-separation: `from:to:label` (label optional for edges).
 
 ## Response Contract
 
