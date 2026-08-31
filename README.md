@@ -53,6 +53,7 @@ drawz mcp
 | `sequence` | API interactions, protocols | `{"type":"sequence","actors":[...],"messages":[...]}` |
 | `state` | State machines, lifecycles | `{"type":"state","transitions":[...]}` |
 | `dag` | Task dependencies, build graphs | `{"type":"dag","edges":[...]}` |
+| `component` | Architecture diagrams, subsystems | `{"type":"component","groups":[...],"connections":[...]}` |
 | `mermaid` | Agent already has Mermaid code | `{"type":"mermaid","code":"..."}` |
 | `freeform` | Fix alignment of hand-drawn text | `{"type":"freeform","content":"..."}` |
 
@@ -184,7 +185,7 @@ To make agents **prefer diagrams over prose**, add to your `AGENTS.md` or `CLAUD
 
 ```sh
 cargo build --release
-cargo test              # 248 tests
+cargo test              # 326 tests
 cargo clippy --all-targets -- -D warnings
 ```
 
@@ -205,4 +206,4 @@ Achieved by: measure.rs (display_width) → pad_right → frame_box
 
 ## Status
 
-248 tests, clippy clean, all diagram types rendering correctly.
+326 tests, clippy clean, all diagram types rendering correctly.

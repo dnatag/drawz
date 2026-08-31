@@ -175,7 +175,7 @@ fn call_introspect() -> CallToolResult {
             {"name": "dag", "use_when": "Task dependencies, build graphs", "minimal": r#"{"type":"dag","edges":[{"from":"A","to":"B"}]}"#, "fields": "edges: [{from,to,label?}], nodes?: string[] or [{id?,label}] (inferred from edges if omitted)"},
             {"name": "component", "use_when": "Architecture diagrams with grouped subsystems and labeled connections between them", "minimal": r#"{"type":"component","groups":[{"label":"A","nodes":["X"]},{"label":"B","nodes":["Y"]}],"connections":[{"from":"X","to":"Y","label":"call"}]}"#, "fields": "groups: [{label, nodes: string[]}], connections: [{from, to, label?}]"}
         ],
-        "common_fields": {"width": "integer, default 80", "title": "string, shown in frame header"},
+        "common_fields": {"width": "integer, default 120", "title": "string, shown in frame header"},
         "version": env!("CARGO_PKG_VERSION")
     });
     CallToolResult::text_content(vec![to_json(&resp).into()])

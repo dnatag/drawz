@@ -485,6 +485,32 @@ fn width_4_minimum_no_panic() {
     assert!(result.output.is_some() || !result.errors.is_empty());
 }
 
+#[test]
+fn dag_width_4_fan_out_no_panic() {
+    // Regression: fan-out DAG at minimum width triggered subtract-with-overflow
+    // in render_arrows when width=0 (inner_width after frame subtraction).
+    let d = Diagram::Dag(DagDiagram {
+        title: None,
+        nodes: None,
+        edges: vec![
+            Edge {
+                from: "A".into(),
+                to: "B".into(),
+                label: None,
+            },
+            Edge {
+                from: "A".into(),
+                to: "C".into(),
+                label: None,
+            },
+        ],
+        subgraphs: None,
+    });
+    let result = render(&d, 4);
+    // Should not panic — may produce truncated output or error
+    assert!(result.output.is_some() || !result.errors.is_empty());
+}
+
 // === Mermaid: dotted arrow with label ===
 
 #[test]

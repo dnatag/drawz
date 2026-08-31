@@ -88,6 +88,12 @@ pub(crate) fn render(
     // Pad all lines to inner_width
     let max_w = lines.iter().map(|l| display_width(l)).max().unwrap_or(0);
     let target_w = max_w.min(ctx.inner_width);
+    if max_w > ctx.inner_width {
+        ctx.warnings.push(format!(
+            "component diagram truncated from {} to {} cols",
+            max_w, ctx.inner_width
+        ));
+    }
     Ok(lines.iter().map(|l| pad_right(l, target_w)).collect())
 }
 
