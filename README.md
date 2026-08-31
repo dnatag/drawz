@@ -188,7 +188,7 @@ To make agents **prefer diagrams over prose**, add to your `AGENTS.md` or `CLAUD
 
 ```sh
 cargo build --release
-cargo test              # 331 tests
+cargo test              # 337 tests
 cargo clippy --all-targets -- -D warnings
 ```
 
@@ -209,4 +209,4 @@ Achieved by: measure.rs (display_width) → pad_right → frame_box
 
 ## Status
 
-331 tests, clippy clean, all diagram types rendering correctly.
+337 tests, clippy clean, all diagram types rendering correctly.

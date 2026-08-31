@@ -1,6 +1,7 @@
 use crate::measure::{display_width, pad_right, truncate};
+use crate::renderers::dag;
 use crate::result::RenderContext;
-use crate::schema::{FlowDiagram, FlowStep};
+use crate::schema::{DagDiagram, Edge, FlowDiagram, FlowStep, Node};
 
 /// Render flow as a vertical pipeline with arrows.
 ///
@@ -39,9 +40,19 @@ pub(crate) fn render(
         let edges = diagram.edges.as_deref().unwrap_or(&[]);
         if is_horizontal {
             let labels: Vec<&str> = nodes.iter().map(|n| n.label.as_str()).collect();
+            if !is_simple_chain(nodes, edges) {
+                ctx.warnings.push(
+                    "flow branches or converges; LR layout flattens all nodes into one \
+                     horizontal chain and does not represent the actual topology — use the \
+                     default (vertical) direction or type 'dag' instead"
+                        .to_string(),
+                );
+            }
             Ok(render_horizontal(&labels, ctx))
-        } else {
+        } else if is_simple_chain(nodes, edges) {
             Ok(render_graph(nodes, edges, ctx))
+        } else {
+            render_as_dag(nodes, edges, ctx)
         }
     } else {
         Err("flow requires 'steps' or 'nodes' field".to_string())
@@ -217,6 +228,86 @@ fn render_graph(
     }
 
     lines
+}
+
+/// True if `edges` describe nothing more than a straight path through `nodes`
+/// in the given order: every node has at most one outgoing and one incoming
+/// edge, and every edge connects node `i` to node `i + 1`.
+///
+/// `render_graph`'s box-list rendering only draws an arrow between
+/// consecutive nodes in input order — it never looks at where an edge
+/// actually points. That's correct (and gives nicer output, with edge
+/// labels) for a genuine linear chain, but silently fabricates a false
+/// topology for anything else (branching, convergence, out-of-order edges).
+/// This check gates which rendering is safe to use.
+fn is_simple_chain(nodes: &[Node], edges: &[Edge]) -> bool {
+    if edges.is_empty() {
+        return true;
+    }
+    let ids: Vec<&str> = nodes
+        .iter()
+        .map(|n| n.id.as_deref().unwrap_or(n.label.as_str()))
+        .collect();
+    for &id in &ids {
+        let out_deg = edges.iter().filter(|e| e.from == id).count();
+        let in_deg = edges.iter().filter(|e| e.to == id).count();
+        if out_deg > 1 || in_deg > 1 {
+            return false;
+        }
+    }
+    edges.iter().all(|e| {
+        let from_idx = ids.iter().position(|&id| id == e.from);
+        let to_idx = ids.iter().position(|&id| id == e.to);
+        matches!((from_idx, to_idx), (Some(fi), Some(ti)) if ti == fi + 1)
+    })
+}
+
+/// Render a branching/converging node+edge flow via the DAG layout engine,
+/// which lays out actual topology instead of assuming list order is edge
+/// order. Falls back to the flat linear listing (all edges preserved as
+/// trailing labels are not attempted) only if the graph has a cycle, since
+/// DAG layout requires acyclic input.
+fn render_as_dag(
+    nodes: &[Node],
+    edges: &[Edge],
+    ctx: &mut RenderContext,
+) -> Result<Vec<String>, String> {
+    let dag_nodes: Vec<Node> = nodes
+        .iter()
+        .map(|n| Node {
+            id: n.id.clone(),
+            label: n.label.clone(),
+        })
+        .collect();
+    let has_labels = edges.iter().any(|e| e.label.is_some());
+    let dag_diagram = DagDiagram {
+        title: None,
+        nodes: Some(dag_nodes),
+        edges: edges.to_vec(),
+        subgraphs: None,
+    };
+
+    match dag::render(&dag_diagram, ctx) {
+        Ok(lines) => {
+            if has_labels {
+                ctx.warnings.push(
+                    "flow branches or converges; edge labels are not shown in graph layout \
+                     (use type 'dag' with a legend, or 'mermaid', to keep branch labels)"
+                        .to_string(),
+                );
+            }
+            Ok(lines)
+        }
+        Err(e) if e.contains("cycle") => {
+            ctx.warnings.push(format!(
+                "flow contains a cycle, which can't be laid out as a DAG; rendered as a flat \
+                 list in input order instead — the shown arrows may not reflect the actual \
+                 edges ({e})"
+            ));
+            Ok(render_graph(nodes, edges, ctx))
+        }
+        Err(e) => Err(e),
+    }
 }
 
 fn fit_line(line: &str, ctx: &mut RenderContext) -> String {

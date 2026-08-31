@@ -44,38 +44,49 @@ pub(crate) fn render(
     };
 
     let mut lines = Vec::new();
+    // Track every transition (by from/to/label identity) actually drawn, so
+    // any transition the main-path walk can't reach is never silently
+    // dropped — it gets appended as text below instead.
+    let mut rendered: HashSet<(&str, &str, Option<&str>)> = HashSet::new();
 
     for (i, &state) in main_path.iter().enumerate() {
         let label = get_label(state);
 
         // Find branch transitions from this state (to states not next on main path)
         let next_main = main_path.get(i + 1).copied();
-        let branches: Vec<(&str, &str)> = diagram
+        let branch_transitions: Vec<&crate::schema::Edge> = diagram
             .transitions
             .iter()
             .filter(|t| t.from == state && t.to != state && Some(t.to.as_str()) != next_main)
-            .map(|t| (t.label.as_deref().unwrap_or(""), t.to.as_str()))
             .collect();
 
-        if branches.is_empty() {
+        if branch_transitions.is_empty() {
             // Simple: just the state box
             let box_lines = render_state_box(&label, ctx);
             lines.extend(box_lines);
         } else {
             // State box with horizontal branch arrow(s) to the right
-            let branch_label = branches[0].0;
-            let branch_target = get_label(branches[0].1);
+            let first = branch_transitions[0];
+            let branch_label = first.label.as_deref().unwrap_or("");
+            let branch_target = get_label(&first.to);
             render_state_with_branch(&label, branch_label, &branch_target, ctx, &mut lines);
+            rendered.insert(key(first));
 
             // Additional branches as text annotations below
-            for &(blabel, btarget) in &branches[1..] {
-                let target_label = get_label(btarget);
+            for t in &branch_transitions[1..] {
+                let blabel = t.label.as_deref().unwrap_or("");
+                let target_label = get_label(&t.to);
                 let annotation = if blabel.is_empty() {
                     format!("  │ → {target_label}")
                 } else {
                     format!("  │ {blabel} → {target_label}")
                 };
                 lines.push(fit_line(&annotation, ctx));
+                rendered.insert(key(t));
+                ctx.warnings.push(format!(
+                    "branch '{state}' → '{}' shown as text (only the first branch gets a box)",
+                    t.to
+                ));
             }
         }
 
@@ -87,6 +98,7 @@ pub(crate) fn render(
         {
             let slabel = t.label.as_deref().unwrap_or("");
             lines.push(fit_line(&format!("  ↺ {slabel}"), ctx));
+            rendered.insert(key(t));
         }
 
         // Transition arrow to next main state
@@ -101,6 +113,7 @@ pub(crate) fn render(
                 } else {
                     lines.push(fit_line("  │", ctx));
                 }
+                rendered.insert(key(t));
             } else {
                 lines.push(fit_line("  │", ctx));
             }
@@ -108,7 +121,38 @@ pub(crate) fn render(
         }
     }
 
+    // Any transition whose source state never got a turn on the main path
+    // (e.g. a branch target that itself has outgoing transitions) would
+    // otherwise vanish entirely. Render those as trailing text so nothing
+    // is silently lost, and warn so the agent knows the layout degraded.
+    let missing: Vec<&crate::schema::Edge> = diagram
+        .transitions
+        .iter()
+        .filter(|t| !rendered.contains(&key(t)))
+        .collect();
+    if !missing.is_empty() {
+        lines.push(fit_line("", ctx));
+        for t in &missing {
+            let from_label = get_label(&t.from);
+            let to_label = get_label(&t.to);
+            let line = match &t.label {
+                Some(l) => format!("  {from_label} ─{l}─→ {to_label}"),
+                None => format!("  {from_label} ──→ {to_label}"),
+            };
+            lines.push(fit_line(&line, ctx));
+        }
+        ctx.warnings.push(format!(
+            "{} transition(s) not reachable from the main path shown as text below the diagram",
+            missing.len()
+        ));
+    }
+
     Ok(lines)
+}
+
+/// Identity of a transition, used to track which ones have been rendered.
+fn key(t: &crate::schema::Edge) -> (&str, &str, Option<&str>) {
+    (t.from.as_str(), t.to.as_str(), t.label.as_deref())
 }
 
 /// Compute the main path by following the first outgoing transition from each state.
@@ -174,6 +218,10 @@ fn render_state_with_branch(
             format!("  │ {branch_label} → {target}")
         };
         out.push(fit_line(&annotation, ctx));
+        ctx.warnings.push(format!(
+            "branch '{state}' → '{target}' needs {total_w} cols but only {} available; shown as text",
+            ctx.inner_width
+        ));
         return;
     }
 

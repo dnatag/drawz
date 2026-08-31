@@ -17,10 +17,7 @@ const BOX_SPACING: usize = 3;
 /// # Errors
 ///
 /// Returns an error if edges are empty and no nodes provided, or if a cycle is detected.
-pub(crate) fn render(
-    diagram: &DagDiagram,
-    _ctx: &mut RenderContext,
-) -> Result<Vec<String>, String> {
+pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
     if diagram.edges.is_empty() && diagram.nodes.is_none() {
         return Err("dag requires at least one edge or node".to_string());
     }
@@ -100,6 +97,12 @@ pub(crate) fn render(
     // Render
     let mut lines = Vec::new();
     let mut level_line_starts: Vec<usize> = Vec::new(); // output line index where each level starts
+                                                        // Edges only get drawn between *adjacent* levels. An edge that skips a
+                                                        // level (e.g. A→C alongside A→B→C) or connects nodes in the same level
+                                                        // has nowhere to go in this layout and would otherwise vanish silently.
+                                                        // Track what actually got drawn so we can report the rest.
+    let mut rendered_pairs: std::collections::HashSet<(usize, usize)> =
+        std::collections::HashSet::new();
 
     for (level_idx, level) in levels.iter().enumerate() {
         if level.is_empty() {
@@ -133,7 +136,12 @@ pub(crate) fn render(
                 let to_label = nodes_with_ids[to_id].1;
                 let &(fl, fp) = label_pos.get(from_label)?;
                 let &(tl, tp) = label_pos.get(to_label)?;
-                (fl == level_idx && tl == next_idx).then_some((fp, tp))
+                if fl == level_idx && tl == next_idx {
+                    rendered_pairs.insert((from_id, to_id));
+                    Some((fp, tp))
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -164,6 +172,38 @@ pub(crate) fn render(
             &level_line_starts,
             &id_to_label,
         );
+    }
+
+    // Edges that skip a level, connect nodes within the same level, or are
+    // self-loops have no home in this layout. Rather than drop them, list
+    // them below the diagram so the topology is never silently incomplete.
+    let mut unrendered: Vec<&crate::schema::Edge> = Vec::new();
+    for e in &diagram.edges {
+        let (Some(&from_id), Some(&to_id)) =
+            (id_to_idx.get(e.from.as_str()), id_to_idx.get(e.to.as_str()))
+        else {
+            continue;
+        };
+        if from_id == to_id || !rendered_pairs.contains(&(from_id, to_id)) {
+            unrendered.push(e);
+        }
+    }
+    if !unrendered.is_empty() {
+        lines.push(String::new());
+        for e in &unrendered {
+            let from_label = get_label(&e.from, diagram);
+            let to_label = get_label(&e.to, diagram);
+            let line = match &e.label {
+                Some(l) => format!("{from_label} ─{l}─→ {to_label} (not shown above)"),
+                None => format!("{from_label} ──→ {to_label} (not shown above)"),
+            };
+            lines.push(line);
+        }
+        ctx.warnings.push(format!(
+            "{} edge(s) skip a level or form a same-level/self connection and can't be drawn \
+             in this layout; listed as text below the diagram",
+            unrendered.len()
+        ));
     }
 
     Ok(lines)

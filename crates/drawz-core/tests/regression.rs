@@ -594,3 +594,241 @@ fn mermaid_state_star_states() {
     assert!(output.contains("Idle"));
     assert!(output.contains("Active"));
 }
+
+// === State: transitions from off-main-path states must not vanish ===
+
+#[test]
+fn state_transition_from_branch_target_not_dropped() {
+    // Regression: the renderer only walked a single linear "main path"
+    // (first-transition-wins). Any state that was never on that path — e.g.
+    // an error-recovery state reached only via a branch — had its own
+    // outgoing transitions silently dropped from the diagram entirely.
+    let d = Diagram::State(StateDiagram {
+        title: None,
+        states: None,
+        transitions: vec![
+            Edge {
+                from: "Idle".into(),
+                to: "Loading".into(),
+                label: Some("start".into()),
+            },
+            Edge {
+                from: "Loading".into(),
+                to: "Ready".into(),
+                label: Some("loaded".into()),
+            },
+            Edge {
+                from: "Loading".into(),
+                to: "Error".into(),
+                label: Some("fail".into()),
+            },
+            Edge {
+                from: "Error".into(),
+                to: "Idle".into(),
+                label: Some("reset".into()),
+            },
+        ],
+    });
+    let result = render(&d, 50);
+    assert_aligned(&result);
+    let output = result.output.unwrap();
+    assert!(
+        output.contains("reset"),
+        "the Error --reset--> Idle transition must appear somewhere, got:\n{output}"
+    );
+    assert!(!result.warnings.is_empty());
+}
+
+// === Flow: branching nodes+edges must not fabricate a false linear chain ===
+
+#[test]
+fn flow_branching_topology_not_flattened_into_fake_chain() {
+    // Regression: render_graph drew nodes strictly in input-list order and
+    // connected each to the next regardless of actual edge topology. A node
+    // with two outgoing edges (branch) only showed the first edge's label
+    // and implied a fake edge between its two targets (e.g. Stage->Rollback,
+    // which doesn't exist) instead of showing them as siblings of Test.
+    let d = Diagram::Flow(FlowDiagram {
+        title: None,
+        direction: None,
+        steps: None,
+        nodes: Some(vec![
+            Node {
+                id: None,
+                label: "Build".into(),
+            },
+            Node {
+                id: None,
+                label: "Test".into(),
+            },
+            Node {
+                id: None,
+                label: "Stage".into(),
+            },
+            Node {
+                id: None,
+                label: "Rollback".into(),
+            },
+        ]),
+        edges: Some(vec![
+            Edge {
+                from: "Build".into(),
+                to: "Test".into(),
+                label: None,
+            },
+            Edge {
+                from: "Test".into(),
+                to: "Stage".into(),
+                label: Some("pass".into()),
+            },
+            Edge {
+                from: "Test".into(),
+                to: "Rollback".into(),
+                label: Some("fail".into()),
+            },
+        ]),
+    });
+    let result = render(&d, 40);
+    assert_aligned(&result);
+    let output = result.output.unwrap();
+    // Both branch targets must be present...
+    assert!(output.contains("Stage"));
+    assert!(output.contains("Rollback"));
+    // ...and Stage must NOT be drawn directly above Rollback as if one
+    // flows into the other — they're siblings branching off Test.
+    let stage_line = output.lines().position(|l| l.contains("Stage")).unwrap();
+    let rollback_line = output.lines().position(|l| l.contains("Rollback")).unwrap();
+    assert_ne!(
+        rollback_line,
+        stage_line + 4,
+        "Stage and Rollback must not render as a fake sequential Stage->Rollback edge"
+    );
+}
+
+#[test]
+fn flow_simple_linear_chain_keeps_edge_label() {
+    // A genuine 1:1 linear chain should still use the nicer per-node
+    // rendering (with edge labels), not be routed through DAG layout.
+    let d = Diagram::Flow(FlowDiagram {
+        title: None,
+        direction: None,
+        steps: None,
+        nodes: Some(vec![
+            Node {
+                id: Some("a".into()),
+                label: "Start".into(),
+            },
+            Node {
+                id: Some("b".into()),
+                label: "End".into(),
+            },
+        ]),
+        edges: Some(vec![Edge {
+            from: "a".into(),
+            to: "b".into(),
+            label: Some("go".into()),
+        }]),
+    });
+    let result = render(&d, 30);
+    assert_aligned(&result);
+    let output = result.output.unwrap();
+    assert!(output.contains("go"));
+}
+
+// === DAG: edges that skip a level must not vanish ===
+
+#[test]
+fn dag_skip_level_edge_not_dropped() {
+    // Regression: edges are only drawn between *adjacent* Sugiyama levels.
+    // A->C alongside A->B->C places C two levels below A, so the direct
+    // A->C edge had nowhere to be drawn and vanished with no trace.
+    let d = Diagram::Dag(DagDiagram {
+        title: None,
+        nodes: None,
+        edges: vec![
+            Edge {
+                from: "A".into(),
+                to: "B".into(),
+                label: None,
+            },
+            Edge {
+                from: "B".into(),
+                to: "C".into(),
+                label: None,
+            },
+            Edge {
+                from: "A".into(),
+                to: "C".into(),
+                label: None,
+            },
+        ],
+        subgraphs: None,
+    });
+    let result = render(&d, 40);
+    assert_aligned(&result);
+    let output = result.output.unwrap();
+    assert!(
+        output.contains('A') && output.contains('C'),
+        "A->C must be represented somewhere in the output, got:\n{output}"
+    );
+    assert!(!result.warnings.is_empty());
+}
+
+// === schema::sanitize: embedded control characters must not break framing ===
+
+#[test]
+fn sanitize_strips_embedded_newline_from_label() {
+    let mut d = Diagram::Flow(FlowDiagram {
+        title: None,
+        direction: None,
+        steps: Some(vec![FlowStep::Label("Te\nst".into())]),
+        nodes: None,
+        edges: None,
+    });
+    sanitize(&mut d);
+    let result = render(&d, 40);
+    // assert_aligned already proves no line was split by an embedded
+    // newline (every line has equal display_width); check the label text
+    // survived, collapsed to a single space.
+    assert_aligned(&result);
+    let output = result.output.unwrap();
+    assert!(output.contains("Te st"));
+}
+
+#[test]
+fn sanitize_leaves_freeform_and_tree_and_mermaid_multiline_fields_untouched() {
+    let mut freeform = Diagram::Freeform(FreeformDiagram {
+        title: None,
+        content: Some("line1\nline2\nline3".into()),
+        lines: None,
+    });
+    sanitize(&mut freeform);
+    if let Diagram::Freeform(d) = &freeform {
+        assert_eq!(d.content.as_deref(), Some("line1\nline2\nline3"));
+    } else {
+        panic!("expected Freeform");
+    }
+
+    let mut tree = Diagram::Tree(TreeDiagram {
+        title: None,
+        root: None,
+        indent: Some("src/\n  main.rs".into()),
+    });
+    sanitize(&mut tree);
+    if let Diagram::Tree(d) = &tree {
+        assert_eq!(d.indent.as_deref(), Some("src/\n  main.rs"));
+    } else {
+        panic!("expected Tree");
+    }
+
+    let mut mermaid = Diagram::Mermaid(MermaidDiagram {
+        title: None,
+        code: "graph LR\nA-->B".into(),
+    });
+    sanitize(&mut mermaid);
+    if let Diagram::Mermaid(d) = &mermaid {
+        assert_eq!(d.code, "graph LR\nA-->B");
+    } else {
+        panic!("expected Mermaid");
+    }
+}

@@ -219,3 +219,139 @@ pub struct Edge {
     pub to: String,
     pub label: Option<String>,
 }
+
+/// Strip embedded newlines/carriage-returns/tabs from every label-like
+/// field, collapsing runs of whitespace left behind.
+///
+/// Renderers build box-drawing frames by measuring a label's display width
+/// and interpolating it directly into a single output line
+/// (`format!("│ {label} │")`). A label containing a literal `\n` splits
+/// that line in two when printed, breaking the frame open and violating the
+/// "every line has the same display width" alignment guarantee — with no
+/// error or warning, since nothing about the string is otherwise invalid.
+///
+/// Call this on every `Diagram` built from untrusted (agent-supplied) JSON,
+/// before rendering. Deliberately does NOT touch `freeform.content`/`lines`,
+/// `tree.indent`, or `mermaid.code` — those fields are multi-line by design.
+pub fn sanitize(diagram: &mut Diagram) {
+    fn sanitize_str(s: &mut String) {
+        if s.contains(['\n', '\r', '\t']) {
+            let mut cleaned = s.replace(['\n', '\r', '\t'], " ");
+            while cleaned.contains("  ") {
+                cleaned = cleaned.replace("  ", " ");
+            }
+            *s = cleaned.trim().to_string();
+        }
+    }
+    fn sanitize_opt(s: &mut Option<String>) {
+        if let Some(inner) = s {
+            sanitize_str(inner);
+        }
+    }
+    fn sanitize_vec(v: &mut [String]) {
+        v.iter_mut().for_each(sanitize_str);
+    }
+    fn sanitize_node(n: &mut Node) {
+        sanitize_str(&mut n.label);
+        sanitize_opt(&mut n.id);
+    }
+    fn sanitize_edge(e: &mut Edge) {
+        sanitize_str(&mut e.from);
+        sanitize_str(&mut e.to);
+        sanitize_opt(&mut e.label);
+    }
+    fn sanitize_connection(c: &mut Connection) {
+        sanitize_str(&mut c.from);
+        sanitize_str(&mut c.to);
+        sanitize_opt(&mut c.label);
+    }
+    fn sanitize_tree_node(n: &mut TreeNode) {
+        sanitize_str(&mut n.label);
+        n.children.iter_mut().for_each(sanitize_tree_node);
+    }
+    fn sanitize_steps(steps: &mut [FlowStep]) {
+        for s in steps {
+            match s {
+                FlowStep::Label(l) => sanitize_str(l),
+                FlowStep::Sub(sub) => {
+                    sanitize_str(&mut sub.label);
+                    sanitize_steps(&mut sub.steps);
+                }
+            }
+        }
+    }
+
+    match diagram {
+        Diagram::Flow(d) => {
+            sanitize_opt(&mut d.title);
+            if let Some(steps) = &mut d.steps {
+                sanitize_steps(steps);
+            }
+            if let Some(nodes) = &mut d.nodes {
+                nodes.iter_mut().for_each(sanitize_node);
+            }
+            if let Some(edges) = &mut d.edges {
+                edges.iter_mut().for_each(sanitize_edge);
+            }
+        }
+        Diagram::State(d) => {
+            sanitize_opt(&mut d.title);
+            if let Some(states) = &mut d.states {
+                states.iter_mut().for_each(sanitize_node);
+            }
+            d.transitions.iter_mut().for_each(sanitize_edge);
+        }
+        Diagram::Tree(d) => {
+            sanitize_opt(&mut d.title);
+            if let Some(root) = &mut d.root {
+                sanitize_tree_node(root);
+            }
+            // d.indent intentionally untouched — multi-line by design.
+        }
+        Diagram::Sequence(d) => {
+            sanitize_opt(&mut d.title);
+            sanitize_vec(&mut d.actors);
+            for m in &mut d.messages {
+                sanitize_str(&mut m.from);
+                sanitize_str(&mut m.to);
+                sanitize_str(&mut m.label);
+            }
+        }
+        Diagram::Table(d) => {
+            sanitize_opt(&mut d.title);
+            sanitize_vec(&mut d.headers);
+            d.rows.iter_mut().for_each(|row| sanitize_vec(row));
+        }
+        Diagram::Dag(d) => {
+            sanitize_opt(&mut d.title);
+            if let Some(nodes) = &mut d.nodes {
+                nodes.iter_mut().for_each(sanitize_node);
+            }
+            d.edges.iter_mut().for_each(sanitize_edge);
+            if let Some(subgraphs) = &mut d.subgraphs {
+                for sg in subgraphs {
+                    sanitize_str(&mut sg.label);
+                    sanitize_vec(&mut sg.node_ids);
+                }
+            }
+        }
+        Diagram::Component(d) => {
+            sanitize_opt(&mut d.title);
+            for g in &mut d.groups {
+                sanitize_str(&mut g.label);
+                sanitize_vec(&mut g.nodes);
+                g.chains.iter_mut().for_each(|chain| sanitize_vec(chain));
+                g.edges.iter_mut().for_each(sanitize_connection);
+            }
+            d.connections.iter_mut().for_each(sanitize_connection);
+        }
+        Diagram::Freeform(d) => {
+            sanitize_opt(&mut d.title);
+            // content/lines intentionally untouched — multi-line by design.
+        }
+        Diagram::Mermaid(d) => {
+            sanitize_opt(&mut d.title);
+            // code intentionally untouched — multi-line DSL.
+        }
+    }
+}
