@@ -24,7 +24,7 @@ fn default_width() -> u16 {
 }
 
 /// The diagram type, discriminated by the `type` field.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Diagram {
     Flow(FlowDiagram),
@@ -41,7 +41,7 @@ pub enum Diagram {
 /// Linear: `{ "steps": ["A", "B", "C"] }`
 /// Nested: `{ "steps": ["A", {"label": "B", "steps": ["X", "Y"]}] }`
 /// Full: `{ "nodes": [...], "edges": [...] }`
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct FlowDiagram {
     pub title: Option<String>,
     /// Direction: "LR" for horizontal, "TD"/"TB" for vertical (default)
@@ -53,7 +53,7 @@ pub struct FlowDiagram {
 }
 
 /// A step: plain label or nested sub-flow.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(untagged)]
 pub enum FlowStep {
     Sub(SubFlow),
@@ -61,7 +61,7 @@ pub enum FlowStep {
 }
 
 /// A named sub-pipeline within a flow.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct SubFlow {
     pub label: String,
     pub steps: Vec<FlowStep>,
@@ -69,7 +69,7 @@ pub struct SubFlow {
 
 /// Minimal: `{ "transitions": [{"from":"A","to":"B","label":"x"}] }`
 /// States inferred from transitions if not provided.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct StateDiagram {
     pub title: Option<String>,
     #[serde(default, deserialize_with = "deserialize_nodes")]
@@ -79,35 +79,35 @@ pub struct StateDiagram {
 
 /// Minimal: `{ "indent": "root\n  child1\n  child2" }`
 /// Full: `{ "root": { "label": "root", "children": [...] } }`
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct TreeDiagram {
     pub title: Option<String>,
     pub root: Option<TreeNode>,
     pub indent: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct TreeNode {
     pub label: String,
     #[serde(default)]
     pub children: Vec<TreeNode>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct SequenceDiagram {
     pub title: Option<String>,
     pub actors: Vec<String>,
     pub messages: Vec<Message>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Message {
     pub from: String,
     pub to: String,
     pub label: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct TableDiagram {
     pub title: Option<String>,
     pub headers: Vec<String>,
@@ -116,7 +116,7 @@ pub struct TableDiagram {
 
 /// Minimal: `{ "edges": [{"from":"A","to":"B"}] }` — nodes inferred.
 /// Full: `{ "nodes": [...], "edges": [...] }`
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DagDiagram {
     pub title: Option<String>,
     #[serde(default, deserialize_with = "deserialize_nodes")]
@@ -135,7 +135,7 @@ pub struct Subgraph {
 
 /// Architecture diagram: groups of nodes with labeled connections between them.
 /// `{ "type": "component", "groups": [...], "connections": [...] }`
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ComponentDiagram {
     pub title: Option<String>,
     pub groups: Vec<ComponentGroup>,
@@ -144,7 +144,7 @@ pub struct ComponentDiagram {
 
 /// A named subsystem containing nodes.
 /// Nodes can be a flat list, or organized into chains (horizontal pipelines).
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct ComponentGroup {
     pub label: String,
     /// Flat node list (rendered vertically). Used when no chains provided.
@@ -159,7 +159,7 @@ pub struct ComponentGroup {
 }
 
 /// A labeled connection between two nodes (which may be in different groups).
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Connection {
     pub from: String,
     pub to: String,
@@ -168,7 +168,7 @@ pub struct Connection {
 
 /// Freeform text block.
 /// `{ "content": "line1\nline2" }` or `{ "lines": ["a","b"] }`
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct FreeformDiagram {
     pub title: Option<String>,
     pub content: Option<String>,
@@ -177,7 +177,7 @@ pub struct FreeformDiagram {
 
 /// Mermaid DSL input — agents already know this format.
 /// `{ "type": "mermaid", "code": "graph LR; A-->B-->C" }`
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct MermaidDiagram {
     pub title: Option<String>,
     pub code: String,
@@ -190,7 +190,7 @@ pub enum NodeInput {
     Label(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Node {
     pub id: Option<String>,
     pub label: String,
@@ -236,11 +236,7 @@ pub struct Edge {
 pub fn sanitize(diagram: &mut Diagram) {
     fn sanitize_str(s: &mut String) {
         if s.contains(['\n', '\r', '\t']) {
-            let mut cleaned = s.replace(['\n', '\r', '\t'], " ");
-            while cleaned.contains("  ") {
-                cleaned = cleaned.replace("  ", " ");
-            }
-            *s = cleaned.trim().to_string();
+            *s = s.split_whitespace().collect::<Vec<_>>().join(" ");
         }
     }
     fn sanitize_opt(s: &mut Option<String>) {

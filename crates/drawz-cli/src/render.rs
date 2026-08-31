@@ -110,9 +110,9 @@ pub fn build_diagram(render_type: RenderType) -> Result<Diagram, String> {
             title,
             direction,
             steps: Some(
-                steps
-                    .split(',')
-                    .map(|s| FlowStep::Label(s.trim().to_string()))
+                split_trimmed(&steps)
+                    .into_iter()
+                    .map(FlowStep::Label)
                     .collect(),
             ),
             nodes: None,
@@ -124,11 +124,8 @@ pub fn build_diagram(render_type: RenderType) -> Result<Diagram, String> {
             rows,
             title,
         } => {
-            let headers: Vec<String> = headers.split(',').map(|s| s.trim().to_string()).collect();
-            let rows: Vec<Vec<String>> = rows
-                .iter()
-                .map(|r| r.split(',').map(|s| s.trim().to_string()).collect())
-                .collect();
+            let headers = split_trimmed(&headers);
+            let rows: Vec<Vec<String>> = rows.iter().map(|r| split_trimmed(r)).collect();
             if rows.is_empty() {
                 return Err("at least one --row is required".into());
             }
@@ -156,7 +153,7 @@ pub fn build_diagram(render_type: RenderType) -> Result<Diagram, String> {
             messages,
             title,
         } => {
-            let actors: Vec<String> = actors.split(',').map(|s| s.trim().to_string()).collect();
+            let actors = split_trimmed(&actors);
             let messages: Vec<Message> = messages
                 .iter()
                 .map(|m| {
@@ -251,8 +248,7 @@ pub fn build_diagram(render_type: RenderType) -> Result<Diagram, String> {
                     let (label, rest) = g.split_once(':').ok_or_else(|| {
                         format!("invalid group format '{g}', expected label:node1,node2,...")
                     })?;
-                    let nodes: Vec<String> =
-                        rest.split(',').map(|s| s.trim().to_string()).collect();
+                    let nodes = split_trimmed(rest);
                     Ok(ComponentGroup {
                         label: label.trim().to_string(),
                         nodes,
@@ -278,6 +274,11 @@ pub fn build_diagram(render_type: RenderType) -> Result<Diagram, String> {
             }))
         }
     }
+}
+
+/// Split a comma-separated flag value into trimmed parts.
+fn split_trimmed(s: &str) -> Vec<String> {
+    s.split(',').map(|part| part.trim().to_string()).collect()
 }
 
 fn read_stdin() -> Result<String, String> {

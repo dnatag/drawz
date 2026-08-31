@@ -109,8 +109,7 @@ fn detect_width() -> u16 {
         .unwrap_or(120)
 }
 
-fn render_and_output(mut diagram: drawz_core::schema::Diagram, width_override: Option<u16>) {
-    drawz_core::schema::sanitize(&mut diagram);
+fn render_and_output(diagram: drawz_core::schema::Diagram, width_override: Option<u16>) {
     let width = width_override.unwrap_or_else(detect_width);
     let result = drawz_core::render(&diagram, width);
     output_result(result);

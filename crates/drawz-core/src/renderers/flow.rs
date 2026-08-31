@@ -272,17 +272,10 @@ fn render_as_dag(
     edges: &[Edge],
     ctx: &mut RenderContext,
 ) -> Result<Vec<String>, String> {
-    let dag_nodes: Vec<Node> = nodes
-        .iter()
-        .map(|n| Node {
-            id: n.id.clone(),
-            label: n.label.clone(),
-        })
-        .collect();
     let has_labels = edges.iter().any(|e| e.label.is_some());
     let dag_diagram = DagDiagram {
         title: None,
-        nodes: Some(dag_nodes),
+        nodes: Some(nodes.to_vec()),
         edges: edges.to_vec(),
         subgraphs: None,
     };

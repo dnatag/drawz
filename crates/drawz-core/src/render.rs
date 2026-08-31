@@ -2,7 +2,7 @@ use crate::frame;
 use crate::mermaid;
 use crate::renderers;
 use crate::result::{RenderContext, RenderResult};
-use crate::schema::Diagram;
+use crate::schema::{self, Diagram};
 
 /// Render a diagram within the given width.
 #[must_use]
@@ -15,6 +15,14 @@ pub fn render(diagram: &Diagram, width: u16) -> RenderResult {
             warnings: Vec::new(),
         };
     }
+
+    // Sanitize on every call, not just at the CLI/MCP entry points, so no
+    // caller — present or future — can bypass it and reintroduce the
+    // frame-corrupting embedded-newline bug. Diagrams are small, so cloning
+    // once per render is negligible.
+    let mut sanitized = diagram.clone();
+    schema::sanitize(&mut sanitized);
+    let diagram = &sanitized;
 
     let framed = matches!(
         diagram,

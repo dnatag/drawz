@@ -103,7 +103,7 @@ fn call_render(
 ) -> CallToolResult {
     let args = Value::Object(args.unwrap_or_default());
 
-    let mut input: DiagramInput = match serde_json::from_value(args.clone()) {
+    let input: DiagramInput = match serde_json::from_value(args.clone()) {
         Ok(d) => d,
         Err(e) => {
             let resp = RenderResponse {
@@ -140,7 +140,6 @@ fn call_render(
         }
     };
 
-    drawz_core::schema::sanitize(&mut input.diagram);
     let result = drawz_core::render(&input.diagram, width);
     let has_errors = result.output.is_none() && !result.errors.is_empty();
 

@@ -486,39 +486,15 @@ fn width_4_minimum_no_panic() {
 }
 
 #[test]
-fn dag_width_4_fan_out_no_panic() {
-    // Regression: fan-out DAG at minimum width triggered subtract-with-overflow
-    // in render_arrows when width=0 (inner_width after frame subtraction).
-    let d = Diagram::Dag(DagDiagram {
-        title: None,
-        nodes: None,
-        edges: vec![
-            Edge {
-                from: "A".into(),
-                to: "B".into(),
-                label: None,
-            },
-            Edge {
-                from: "A".into(),
-                to: "C".into(),
-                label: None,
-            },
-        ],
-        subgraphs: None,
-    });
-    let result = render(&d, 4);
-    // Should not panic — may produce truncated output or error
-    assert!(result.output.is_some() || !result.errors.is_empty());
-}
-
-#[test]
 fn dag_fan_out_connector_complete_at_narrow_width() {
     // Regression: render_arrows/char_row sized their connector rows to
     // ctx.inner_width (the requested width) while render_level lays boxes
     // out at natural size. At small requested widths this clipped the
     // connector, leaving a dangling '┌' with no line reaching the child
     // boxes. Connector rows must be sized to the same natural width as the
-    // boxes (max_level_w), not the requested width.
+    // boxes (max_level_w), not the requested width. This also covers the
+    // subtract-with-overflow panic that used to happen at width 4
+    // (inner_width == 0) — assert_aligned proves no panic occurred.
     let d = Diagram::Dag(DagDiagram {
         title: None,
         nodes: None,
