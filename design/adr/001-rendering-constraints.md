@@ -25,13 +25,13 @@ drawz renders structured diagrams as ASCII/Unicode text for terminal display. Te
 
 Vertical scroll is fine — terminals handle it naturally. Horizontal overflow destroys alignment and readability. drawz MUST fit all output within the configured width.
 
-**Width parameter:** Default 80. Agent or caller may specify a different width.
+**Width parameter:** Default 120. Agent or caller may specify a different width.
 
-### 2. drawz controls layout, not the agent
+### 2. drawz controls layout by default, agent may override
 
 The agent describes *what* to show. drawz decides *how* to lay it out based on available width. If 5 nodes fit horizontally, render horizontally. If they don't, switch to vertical.
 
-The agent does not specify layout direction. drawz chooses automatically based on content and available width.
+By default, drawz chooses layout direction automatically based on content and available width. However, agents may specify `direction: "LR"` for horizontal layout — useful for flows parsed from Mermaid `graph LR` or when horizontal layout is semantically important (e.g., request→response flows). If the explicit direction doesn't fit, drawz warns and falls back to vertical.
 
 ### 3. Labels truncate with visible `…`
 

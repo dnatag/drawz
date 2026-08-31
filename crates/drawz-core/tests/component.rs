@@ -264,3 +264,42 @@ fn component_stacked_groups_with_chains() {
     assert!(output.contains("├─uses─→"));
     assert!(output.contains("deserialize"));
 }
+
+#[test]
+fn component_truncation_emits_warning() {
+    // Wide diagram at narrow width should emit a truncation warning
+    let d = Diagram::Component(ComponentDiagram {
+        title: None,
+        groups: vec![
+            ComponentGroup {
+                label: "Left Group".into(),
+                nodes: vec!["LongNodeNameA".into(), "LongNodeNameB".into()],
+                chains: vec![],
+                edges: vec![],
+            },
+            ComponentGroup {
+                label: "Right Group".into(),
+                nodes: vec!["LongNodeNameC".into(), "LongNodeNameD".into()],
+                chains: vec![],
+                edges: vec![],
+            },
+        ],
+        connections: vec![Connection {
+            from: "LongNodeNameA".into(),
+            to: "LongNodeNameC".into(),
+            label: Some("connects".into()),
+        }],
+    });
+    let result = render(&d, 30);
+    assert!(result.output.is_some(), "should produce output");
+    assert!(
+        !result.warnings.is_empty(),
+        "should emit truncation warning, got: {:?}",
+        result.warnings
+    );
+    assert!(
+        result.warnings.iter().any(|w| w.contains("truncated")),
+        "warning should mention truncation: {:?}",
+        result.warnings
+    );
+}

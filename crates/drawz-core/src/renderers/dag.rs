@@ -242,6 +242,10 @@ fn render_arrows(
     width: usize,
     out: &mut Vec<String>,
 ) {
+    // Nothing can be rendered at width 0
+    if width == 0 {
+        return;
+    }
     if edges.is_empty() {
         out.push(pad_right("  │", width));
         out.push(pad_right("  ▼", width));
@@ -267,21 +271,24 @@ fn render_arrows(
     let right = *all_xs.last().unwrap();
 
     let mut row = vec![' '; width];
-    let fill_end = right.min(width - 1);
-    for ch in &mut row[left..=fill_end] {
-        *ch = '─';
-    }
-
-    for &x in &all_xs {
-        if x >= width {
-            continue;
+    // Guard: if left >= width, nothing fits — emit empty connector row
+    if left < width {
+        let fill_end = right.min(width - 1);
+        for ch in &mut row[left..=fill_end] {
+            *ch = '─';
         }
-        row[x] = junction_char(
-            src_xs.contains(&x),
-            dst_xs.contains(&x),
-            x > left,
-            x < right,
-        );
+
+        for &x in &all_xs {
+            if x >= width {
+                continue;
+            }
+            row[x] = junction_char(
+                src_xs.contains(&x),
+                dst_xs.contains(&x),
+                x > left,
+                x < right,
+            );
+        }
     }
     out.push(row.into_iter().collect());
 

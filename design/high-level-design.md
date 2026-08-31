@@ -235,14 +235,15 @@ This holds because:
 
 ### Why no validator trait is needed
 
-If every renderer uses `pad_right(content, inner_width)`, misalignment can't happen — the padding function guarantees it. A `debug_assert!` in tests verifies this as a safety net:
+If every renderer uses `pad_right(content, inner_width)`, misalignment can't happen — the padding function guarantees it. Integration tests use an `assert_aligned` helper to verify this across all diagram types:
 
 ```rust
-#[cfg(debug_assertions)]
-fn assert_alignment(lines: &[String], expected_width: usize) {
-    for (i, line) in lines.iter().enumerate() {
-        assert_eq!(measure::display_width(line), expected_width,
-            "alignment broken on line {i}: {line:?}");
+// tests/regression.rs
+fn assert_aligned(result: &RenderResult) {
+    let output = result.output.as_ref().expect("expected output");
+    let first_w = output.lines().next().map(display_width).unwrap_or(0);
+    for line in output.lines() {
+        assert_eq!(display_width(line), first_w, "misaligned: {line:?}");
     }
 }
 ```

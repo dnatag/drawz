@@ -26,7 +26,7 @@ drawz returns a structured response for every render call:
 
 `warnings` — rendering compromises (truncation, layout changes). Output was produced but is degraded.
 
-### Four outcomes
+### Five outcomes
 
 **1. Perfect fit** — no errors, no warnings:
 
@@ -53,7 +53,21 @@ drawz returns a structured response for every render call:
 }
 ```
 
-**3. Cannot render** — rendering error (valid input, but impossible at this width):
+**3. Overflow without truncation** — content exceeds requested width, frame grows to fit:
+
+```json
+{
+  "output": "┌────────────────────────────────────────────┐\n│ ...",
+  "fit": false,
+  "rendered_width": 140,
+  "errors": [],
+  "warnings": []
+}
+```
+
+This occurs when a diagram's natural width exceeds the requested width but the renderer produces content without truncating it. drawz grows the frame to the natural content width rather than cutting off box-drawing characters mid-line. The agent can check `fit: false` with `rendered_width > requested_width` to detect this.
+
+**4. Cannot render** — rendering error (valid input, but impossible at this width):
 
 ```json
 {
@@ -64,7 +78,7 @@ drawz returns a structured response for every render call:
 }
 ```
 
-**4. Invalid input** — schema/validation error:
+**5. Invalid input** — schema/validation error:
 
 ```json
 {
@@ -112,3 +126,9 @@ Each entry is a plain string. Suggestions are prefixed with `suggestion:` and hi
 - Suggestions create a feedback loop that improves agent behavior
 - Single response shape regardless of outcome — simple to parse
 - CLI mode prints `output` to stdout, `errors` + `warnings` to stderr
+
+### MCP session width persistence
+
+In MCP mode, the server remembers the width across calls within a session. Once an agent explicitly passes a `width` parameter, all subsequent calls in that session use that width unless overridden.
+
+This enables consistent output width without repeating the parameter on every call. However, it means the same input JSON can produce different outputs in two sessions if different widths were set earlier. If determinism across sessions matters, always pass `width` explicitly.

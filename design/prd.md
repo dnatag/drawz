@@ -102,6 +102,7 @@ Heredoc avoids all escaping issues. The skill also embeds the diagram type mappi
 | `state` | states + transitions | State machines, lifecycles | Medium |
 | `sequence` | actors + messages | API interactions, protocols | Medium |
 | `dag` | nodes + edges | Task dependencies, build graphs | High |
+| `component` | groups + connections | Architecture diagrams, subsystem layouts | High |
 
 ### When agents reach for drawz
 
@@ -129,9 +130,9 @@ Every diagram type supports a **minimal form** (fewest tokens for the common cas
 |-------|------|---------|-------------|
 | `type` | string | (required) | Diagram type discriminator |
 | `title` | string | none | Optional title rendered inside frame |
-| `width` | integer | 80 | Maximum output width in characters |
+| `width` | integer | 120 | Maximum output width in characters |
 
-Width can be set in the JSON input, as a CLI flag (`--width 120`), or as an MCP tool parameter. Precedence: CLI/MCP flag > JSON field > default (80).
+Width can be set in the JSON input, as a CLI flag (`--width 120`), or as an MCP tool parameter. Precedence: CLI/MCP flag > JSON field > default (120).
 
 ### freeform
 
@@ -273,12 +274,30 @@ Note: States are inferred from transitions if not declared. Declare states expli
 
 Note: Nodes are inferred from edges if not declared. Declare nodes explicitly only for isolated nodes (no edges).
 
+### component
+
+Architecture diagrams with groups of nodes and labeled connections between groups.
+
+**Minimal** — groups with nodes, connections between them:
+
+```json
+{"type":"component","groups":[{"label":"Frontend","nodes":["UI","Router"]},{"label":"Backend","nodes":["API","DB"]}],"connections":[{"from":"Router","to":"API","label":"REST"}]}
+```
+
+**With chains** — horizontal pipelines within a group:
+
+```json
+{"type":"component","groups":[{"label":"Pipeline","chains":[["Parse","Transform","Emit"]],"edges":[]}],"connections":[]}
+```
+
+Note: Use `nodes` for flat vertical lists, `chains` for horizontal pipelines. Connected nodes across groups are vertically aligned so arrows route straight.
+
 ## 6. Output Requirements
 
 - Correct column alignment regardless of Unicode character widths
 - Pure text output — works in any terminal, no image protocol needed
 - Deterministic: same input + same width = same output, always
-- Width-bounded: output never exceeds the configured width (default: 80)
+- Width-bounded: output never exceeds the configured width (default: 120)
 
 ### Framing rules per diagram type
 
@@ -291,6 +310,7 @@ Note: Nodes are inferred from edges if not declared. Declare nodes explicitly on
 | `state` | Outer box with title | Groups the state machine as a unit |
 | `sequence` | Outer box with title | Bounds the interaction diagram |
 | `dag` | Outer box with title | Groups the dependency graph |
+| `component` | Outer box with title | Groups architecture subsystems as a unit |
 | `mermaid` | Inherits from converted type | Mermaid→Flow gets flow framing, etc. |
 
 "Framed" means the output is a **self-contained visual unit** that a human can distinguish from surrounding text. For most types that's a Unicode box border. For table and tree, the structure itself provides visual boundaries.
@@ -394,9 +414,9 @@ One tool with the `type` field as discriminator. Keeps context overhead minimal 
     "properties": {
       "type": {
         "type": "string",
-        "enum": ["freeform", "mermaid", "flow", "table", "tree", "sequence", "state", "dag"]
+        "enum": ["freeform", "mermaid", "flow", "table", "tree", "sequence", "state", "dag", "component"]
       },
-      "width": { "type": "integer", "default": 80 },
+      "width": { "type": "integer", "default": 120 },
       "title": { "type": "string" }
     },
     "required": ["type"],
@@ -454,18 +474,18 @@ On invalid input:
 
 ### CLI
 
-- `drawz --schema` — dumps JSON schema for all diagram types
-- `drawz --example flow` — prints an example input/output pair for a given type
-- `drawz --types` — lists supported diagram types with one-line descriptions
+- `drawz --help` — shows usage, available commands
+- `drawz render --help` — lists all diagram types with subcommand names
+- `drawz render <type> --help` — shows type-specific flags and examples
 
 ### MCP
 
-- `introspect` tool — returns capabilities, supported types, and examples
+- `introspect_drawz` tool — returns capabilities, supported types, minimal examples, and field descriptions
 - Tool descriptions embed examples directly
 
 ### Diagram Type Mapping
 
-Agents think in terms of what they want to *communicate*, not drawz type names. The `introspect` tool and `--types` output include this mapping so agents pick the right type without guessing:
+Agents think in terms of what they want to *communicate*, not drawz type names. The `introspect_drawz` tool output and `drawz render --help` include this mapping so agents pick the right type without guessing:
 
 | What you want to show | Use type | Why |
 |----------------------|----------|-----|
@@ -544,7 +564,7 @@ CLI prints `output` to stdout, `errors` + `warnings` to stderr. MCP returns the 
 - Output aligns perfectly in any monospace terminal
 - MCP server exposes `render_diagram` + `introspect_drawz` with example-bearing descriptions
 - Structured response includes fit/errors/warnings for agent self-correction
-- CLI supports `drawz --schema`, `drawz --example <type>`, and `drawz --types`
+- CLI supports `drawz render --help` to list types and `drawz render <type> --help` for type-specific flags
 - Heredoc CLI pattern works without escaping issues
 - Same JSON format works via MCP, CLI, and Rust library
 

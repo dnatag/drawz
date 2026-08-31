@@ -23,7 +23,8 @@ drawz-core/           Schema, rendering engine, alignment guarantee
 │   ├── flow.rs        Vertical + horizontal (LR) pipelines
 │   ├── state.rs       ╭─╮ rounded state boxes, labeled transitions
 │   ├── sequence.rs    Actor columns, lifeline arrows, truncation warnings
-│   └── dag.rs         ascii-dag Sugiyama layout (diamond, fan-out)
+│   ├── dag.rs         ascii-dag Sugiyama layout (diamond, fan-out)
+│   └── component.rs   Architecture diagrams: grouped nodes, labeled connections
 └── src/mermaid/       Mermaid subset parser
     ├── mod.rs         Module declarations + re-export
     ├── parse.rs       Dispatch: flowchart → Flow/DAG, sequence, state
@@ -79,12 +80,12 @@ To make agents **prefer diagrams over prose**, add these lines to your `AGENTS.m
 - **Unit tests:** inline `#[cfg(test)] mod tests` in source files
 - **Integration tests:** `tests/` directory, one file per diagram type
 - **Test names:** `should_<behavior>_when_<condition>`
-- **248 tests total**, clippy clean with `-D warnings`
+- **326 tests**, clippy clean with `-D warnings`
 
 ## Useful Commands
 
 ```sh
-cargo test                # all 248 tests
+cargo test                # all 326 tests
 cargo test --test mermaid # single test file
 cargo clippy --all-targets -- -D warnings
 cargo build --release
