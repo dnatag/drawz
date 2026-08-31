@@ -39,6 +39,7 @@ drawz render state --edge 'Idle:Running:start' --edge 'Running:Done:finish'
 drawz render dag --edge 'Parse:Lint' --edge 'Parse:Compile' --edge 'Lint:Link' --edge 'Compile:Link'
 drawz render mermaid --code 'graph LR; A-->B-->C'
 drawz render freeform --content 'line1\nline2\nline3'
+drawz render component --group 'Frontend:UI,Router' --group 'Backend:API,DB' --connect 'Router:API:REST'
 ```
 
 ### Method 2: JSON argument (complex diagrams)
@@ -89,6 +90,9 @@ echo '{"type":"table","headers":["A","B"],"rows":[["1","2"]]}' | drawz
 | `dag` | `--edge` (from:to or from:to:label, repeatable), `--title` |
 | `mermaid` | `--code` (or stdin), `--title` |
 | `freeform` | `--content` (use `\n` for newlines, or stdin), `--title` |
+| `component` | `--group` (`label:node1,node2,...`, repeatable), `--connect` (from:to or from:to:label, repeatable), `--title` |
+
+`component --group`/`--connect` only cover flat node lists and cross-group connections. For chains (horizontal pipelines within a group) or internal group edges, use the JSON/heredoc method instead.
 
 ## Width Handling
 

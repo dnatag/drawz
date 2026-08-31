@@ -17,7 +17,10 @@ const BOX_SPACING: usize = 3;
 /// # Errors
 ///
 /// Returns an error if edges are empty and no nodes provided, or if a cycle is detected.
-pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Vec<String>, String> {
+pub(crate) fn render(
+    diagram: &DagDiagram,
+    _ctx: &mut RenderContext,
+) -> Result<Vec<String>, String> {
     if diagram.edges.is_empty() && diagram.nodes.is_none() {
         return Err("dag requires at least one edge or node".to_string());
     }
@@ -114,8 +117,8 @@ pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Ve
         let next_level = &levels[next_idx];
         if next_level.is_empty() {
             let center = offsets[level_idx] + level_widths[level_idx] / 2;
-            lines.push(char_row(center, '│', ctx.inner_width));
-            lines.push(char_row(center, '▼', ctx.inner_width));
+            lines.push(char_row(center, '│', max_level_w));
+            lines.push(char_row(center, '▼', max_level_w));
             continue;
         }
 
@@ -138,7 +141,7 @@ pub(crate) fn render(diagram: &DagDiagram, ctx: &mut RenderContext) -> Result<Ve
             &cur_centers,
             &next_centers,
             &level_edges,
-            ctx.inner_width,
+            max_level_w,
             &mut lines,
         );
     }

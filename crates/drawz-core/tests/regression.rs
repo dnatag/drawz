@@ -511,6 +511,46 @@ fn dag_width_4_fan_out_no_panic() {
     assert!(result.output.is_some() || !result.errors.is_empty());
 }
 
+#[test]
+fn dag_fan_out_connector_complete_at_narrow_width() {
+    // Regression: render_arrows/char_row sized their connector rows to
+    // ctx.inner_width (the requested width) while render_level lays boxes
+    // out at natural size. At small requested widths this clipped the
+    // connector, leaving a dangling '┌' with no line reaching the child
+    // boxes. Connector rows must be sized to the same natural width as the
+    // boxes (max_level_w), not the requested width.
+    let d = Diagram::Dag(DagDiagram {
+        title: None,
+        nodes: None,
+        edges: vec![
+            Edge {
+                from: "A".into(),
+                to: "B".into(),
+                label: None,
+            },
+            Edge {
+                from: "A".into(),
+                to: "C".into(),
+                label: None,
+            },
+        ],
+        subgraphs: None,
+    });
+    for width in [4, 5, 6, 7, 8, 9, 10] {
+        let result = render(&d, width);
+        assert_aligned(&result);
+        let output = result.output.unwrap();
+        assert!(
+            output.contains('┴') || output.contains('┬'),
+            "width {width}: connector should branch cleanly, got:\n{output}"
+        );
+        assert!(
+            !output.lines().any(|l| l.trim_end().ends_with('┌')),
+            "width {width}: connector left dangling, got:\n{output}"
+        );
+    }
+}
+
 // === Mermaid: dotted arrow with label ===
 
 #[test]
